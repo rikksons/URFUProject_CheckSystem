@@ -16,4 +16,7 @@ async def main():
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
-    asyncio.run(main())
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt: # Чтобы красиво выключался
+        print('Bot was disabled')
