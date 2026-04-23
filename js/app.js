@@ -269,7 +269,6 @@ document.addEventListener("DOMContentLoaded", () => {
         const roleOptions = `
             <option value="Эксперт">🎓 Эксперт</option>
             <option value="Соорганизатор">🛡️ Соорганизатор</option>
-            ${!isExam ? '<option value="Ученик">👤 Ученик</option>' : ''}
         `;
 
         activeProject.joinRequests.forEach(req => {
@@ -419,8 +418,6 @@ document.addEventListener("DOMContentLoaded", () => {
             participantMenu.style.display = 'block';
             participantMenu.style.left = `${event.pageX - 160}px`;
             participantMenu.style.top = `${event.pageY}px`;
-            const roleOptionStudent = document.getElementById("role-option-student");
-            if (roleOptionStudent) roleOptionStudent.style.display = activeProject.type === 'exam' ? 'none' : 'block';
         }
     }
 
@@ -553,8 +550,10 @@ document.addEventListener("DOMContentLoaded", () => {
     if (btnInvite && inviteModal) {
         btnInvite.onclick = () => {
             document.getElementById("invite-tg-tag").value = '';
-            const isExam = activeProject.type === 'exam';
-            document.getElementById("invite-role").innerHTML = `<option value="Эксперт">🎓 Эксперт</option><option value="Соорганизатор">🛡️ Соорганизатор</option>${!isExam ? '<option value="Ученик">👤 Ученик</option>' : ''}`;
+            document.getElementById("invite-role").innerHTML = `
+                <option value="Эксперт">🎓 Эксперт</option>
+                <option value="Соорганизатор">🛡️ Соорганизатор</option>
+            `;
             inviteModal.style.display = 'flex';
         };
     }
