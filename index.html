@@ -116,6 +116,9 @@
                                     style="width: 250px;">
                                 <button id="btn-toggle-selection" class="btn btn-outline"
                                     style="border-color: var(--border-color);">☑️ Выбрать работы</button>
+                                <button id="btn-add-exam-work" class="btn"
+                                    style="background: var(--accent-blue); color: white; display: none;">📤 Загрузить
+                                    работу</button>
                             </div>
 
                             <div id="batch-actions-toolbar" style="display: none; gap: 10px;">
@@ -288,6 +291,22 @@
             </div>
         </div>
     </div>
+    </div>
+    <!-- Модалка загрузки работы (Экзамен) -->
+    <div id="upload-exam-modal" class="modal" style="display: none;">
+        <div class="modal-content" style="max-width: 400px; min-height: auto;">
+            <span class="close-modal" id="close-upload-exam">&times;</span>
+            <h3 style="margin-bottom: 20px;">Загрузить работу (Экзамен)</h3>
+
+            <div class="form-group">
+                <label>Ссылка на файл (PDF, архив и т.д.)</label>
+                <input type="text" id="exam-file-url" placeholder="https://storage.link/file.pdf" class="input-field">
+            </div>
+
+            <button id="btn-submit-exam-work" class="btn"
+                style="width: 100%; margin-top: 25px; background: var(--accent-blue); color: white;">Добавить в
+                базу</button>
+        </div>
     </div>
 </body>
 

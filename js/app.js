@@ -87,7 +87,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
         projects.forEach(proj => {
             if (!proj) return;
-            
+
             const div = document.createElement("div");
             div.className = `project-item ${proj.id === activeProject?.id ? 'active' : ''}`;
             const badgeHTML = proj.joinRequests && proj.joinRequests.length > 0
@@ -96,7 +96,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
             const firstChar = proj.name ? proj.name.charAt(0) : '?';
             const projectName = (proj.name || 'Без названия').substring(0, 15);
-            
+
             div.innerHTML = `
                 <div class="project-icon ${proj.type === 'p2p' ? 'blue' : 'green'}">${firstChar}</div>
                 <div class="project-info" style="width: 100%;">
@@ -110,10 +110,10 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     let isCodeVisible = false;
-    
+
     function renderHeader() {
         if (!activeProject) return;
-        
+
         const statusDot = activeProject.isSystemRunning
             ? '<span class="status-indicator active"></span>Запущено'
             : '<span class="status-indicator paused"></span>На паузе';
@@ -122,16 +122,16 @@ document.addEventListener("DOMContentLoaded", () => {
         if (titleEl) {
             titleEl.innerHTML = `${activeProject.name || 'Проект'} <span style="font-size: 12px; font-weight: normal; margin-left: 10px;">${statusDot}</span>`;
         }
-        
+
         const iconEl = document.getElementById("header-icon");
         if (iconEl) {
             iconEl.innerText = activeProject.name ? activeProject.name.charAt(0) : '?';
             iconEl.className = `project-icon large ${activeProject.type === 'p2p' ? 'blue' : 'green'}`;
         }
-        
+
         const typeEl = document.getElementById("header-type");
         if (typeEl) typeEl.innerText = activeProject.type === 'p2p' ? "Peer-to-Peer" : "Экзаменационный";
-        
+
         const dateEl = document.getElementById("header-date");
         if (dateEl) dateEl.innerText = activeProject.date || '—';
 
@@ -221,10 +221,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
             const viewBtn = tr.querySelector('.btn-view');
             if (viewBtn) viewBtn.onclick = (e) => { e.stopPropagation(); openWorkModal(sub); };
-            
+
             const reviewsBtn = tr.querySelector('.btn-reviews');
             if (reviewsBtn) reviewsBtn.onclick = (e) => { e.stopPropagation(); showReviewsPanel(sub, avgScore); };
-            
+
             const menuBtn = tr.querySelector('.btn-menu');
             if (menuBtn) menuBtn.onclick = (e) => { e.stopPropagation(); showContextMenu(e, sub.id); };
 
@@ -244,7 +244,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
         activeProject.experts.forEach(exp => {
             if (!exp) return;
-            
+
             const div = document.createElement("div");
             div.className = "participant-item";
             div.innerHTML = `
@@ -430,7 +430,7 @@ document.addEventListener("DOMContentLoaded", () => {
     // 6. КОНТЕКСТНЫЕ МЕНЮ
     // ==========================================
     let currentSelectedSubmissionId = null;
-    
+
     function showContextMenu(event, id) {
         currentSelectedSubmissionId = id;
         if (contextMenu) {
@@ -441,7 +441,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     let currentSelectedParticipantTg = null;
-    
+
     function showParticipantMenu(event, tg) {
         currentSelectedParticipantTg = tg;
         if (participantMenu) {
@@ -461,7 +461,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
             const projectsResponse = await api.getProjects();
             projects = projectsResponse.data || projectsResponse;
-            
+
             if (!Array.isArray(projects)) projects = [];
 
             if (projects.length > 0) {
@@ -631,7 +631,7 @@ document.addEventListener("DOMContentLoaded", () => {
         if (!activeProject) return;
         const sub = activeProject.submissions?.find(s => s.id === id);
         if (!sub) return;
-        
+
         const myReview = sub.reviews?.find(r => r.reviewerTg === currentUser?.tg);
 
         let modal = document.getElementById("exam-review-modal");
@@ -670,7 +670,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 console.warn("activeProject is null, skipping updateDashboard");
                 return;
             }
-            
+
             if (typeof renderSidebarProjects === 'function') renderSidebarProjects();
             if (typeof renderHeader === 'function') renderHeader();
             if (typeof renderExperts === 'function') renderExperts();
@@ -688,6 +688,14 @@ document.addEventListener("DOMContentLoaded", () => {
 
             if (currentRole === 'organizer') {
                 if (orgWorkspace) orgWorkspace.style.display = 'block';
+                const btnAddExamWork = document.getElementById("btn-add-exam-work");
+                if (btnAddExamWork) {
+                    if (activeProject && activeProject.type === 'exam') {
+                        btnAddExamWork.style.display = 'inline-block';
+                    } else {
+                        btnAddExamWork.style.display = 'none';
+                    }
+                }
                 else {
                     if (statsGrid) statsGrid.style.display = 'grid';
                     if (tableContainer) tableContainer.style.display = 'block';
@@ -747,8 +755,8 @@ document.addEventListener("DOMContentLoaded", () => {
             if (!activeProject) return;
             if (confirm("Вы уверены, что хотите удалить эту работу?")) {
                 activeProject.submissions = activeProject.submissions?.filter(s => s.id !== currentSelectedSubmissionId) || [];
-                renderTable(); 
-                if (contextMenu) contextMenu.style.display = 'none'; 
+                renderTable();
+                if (contextMenu) contextMenu.style.display = 'none';
                 updateStatsCounters();
             }
         };
@@ -760,9 +768,9 @@ document.addEventListener("DOMContentLoaded", () => {
             if (!activeProject) return;
             const sub = activeProject.submissions?.find(s => s.id === currentSelectedSubmissionId);
             if (sub && confirm(`Сбросить результаты для ${sub.name}?`)) {
-                sub.reviews = []; 
+                sub.reviews = [];
                 sub.status = 'checking';
-                renderTable(); 
+                renderTable();
                 updateStatsCounters();
             }
         };
@@ -784,7 +792,7 @@ document.addEventListener("DOMContentLoaded", () => {
             if (!activeProject) return;
             if (confirm("Исключить участника из проекта?")) {
                 activeProject.experts = activeProject.experts?.filter(p => p.tg !== currentSelectedParticipantTg) || [];
-                renderExperts(); 
+                renderExperts();
                 if (participantMenu) participantMenu.style.display = 'none';
             }
         };
@@ -795,13 +803,13 @@ document.addEventListener("DOMContentLoaded", () => {
     if (btnToggleCode && codeDisplay && activeProject) {
         btnToggleCode.onclick = () => {
             isCodeVisible = !isCodeVisible;
-            if (isCodeVisible) { 
-                codeDisplay.innerText = activeProject.code || '•••••'; 
-                codeDisplay.style.letterSpacing = "normal"; 
+            if (isCodeVisible) {
+                codeDisplay.innerText = activeProject.code || '•••••';
+                codeDisplay.style.letterSpacing = "normal";
             }
-            else { 
-                codeDisplay.innerText = "•••••••••••••••••••••••"; 
-                codeDisplay.style.letterSpacing = "2px"; 
+            else {
+                codeDisplay.innerText = "•••••••••••••••••••••••";
+                codeDisplay.style.letterSpacing = "2px";
             }
         };
     }
@@ -846,9 +854,9 @@ document.addEventListener("DOMContentLoaded", () => {
                 activeProject.isSystemRunning = true;
                 alert("Проверка запущена на сервере!");
                 updateDashboard();
-            } catch (e) { 
+            } catch (e) {
                 console.error(e);
-                alert("Ошибка запуска на сервере!"); 
+                alert("Ошибка запуска на сервере!");
             }
         };
     }
@@ -862,9 +870,9 @@ document.addEventListener("DOMContentLoaded", () => {
                 activeProject.isSystemRunning = false;
                 alert("Проверка остановлена на сервере.");
                 updateDashboard();
-            } catch (e) { 
+            } catch (e) {
                 console.error(e);
-                alert("Ошибка остановки на сервере!"); 
+                alert("Ошибка остановки на сервере!");
             }
         };
     }
@@ -889,10 +897,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const btnRequestsEl = document.getElementById("btn-requests");
     if (btnRequestsEl && requestsModal) {
-        btnRequestsEl.onclick = (e) => { 
-            e.preventDefault(); 
-            renderRequestsModal(); 
-            if (requestsModal) requestsModal.style.display = 'flex'; 
+        btnRequestsEl.onclick = (e) => {
+            e.preventDefault();
+            renderRequestsModal();
+            if (requestsModal) requestsModal.style.display = 'flex';
         };
     }
 
@@ -930,7 +938,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
                 const nameInputField = document.getElementById("new-project-name");
                 if (nameInputField) nameInputField.value = "";
-                
+
                 if (createProjectModal) createProjectModal.style.display = 'none';
 
                 alert("✅ Проект успешно создан!");
@@ -947,7 +955,7 @@ document.addEventListener("DOMContentLoaded", () => {
         btnInvite.onclick = () => {
             const tgInput = document.getElementById("invite-tg-tag");
             if (tgInput) tgInput.value = '';
-            
+
             const roleSelect = document.getElementById("invite-role");
             if (roleSelect) {
                 roleSelect.innerHTML = `
@@ -975,7 +983,7 @@ document.addEventListener("DOMContentLoaded", () => {
             if (!activeProject.experts) activeProject.experts = [];
             activeProject.experts.push({ initials: mockName.substring(0, 2).toUpperCase(), name: mockName, tg: tgTag, role: role });
             alert(`Приглашение отправлено ${tgTag}`);
-            if (inviteModal) inviteModal.style.display = 'none'; 
+            if (inviteModal) inviteModal.style.display = 'none';
             renderExperts();
         };
     }
@@ -1138,7 +1146,58 @@ document.addEventListener("DOMContentLoaded", () => {
             updateDashboard();
         };
     }
+    // ==========================================
+    // ЛОГИКА ЗАГРУЗКИ РАБОТЫ (ЭКЗАМЕН) - API READY
+    // ==========================================
 
+    // Открытие модалки
+    const btnAddExamWork = document.getElementById("btn-add-exam-work");
+    const uploadExamModal = document.getElementById("upload-exam-modal");
+
+    if (btnAddExamWork && uploadExamModal) {
+        btnAddExamWork.onclick = () => {
+            document.getElementById("exam-file-url").value = ""; // Очищаем поле
+            uploadExamModal.style.display = "flex";
+        };
+    }
+
+    // Закрытие модалки
+    const closeUploadExam = document.getElementById("close-upload-exam");
+    if (closeUploadExam) {
+        closeUploadExam.onclick = () => {
+            uploadExamModal.style.display = "none";
+        };
+    }
+
+    // Отправка на бэкенд
+    const btnSubmitExamWork = document.getElementById("btn-submit-exam-work");
+    if (btnSubmitExamWork) {
+        btnSubmitExamWork.onclick = async () => {
+            const fileUrl = document.getElementById("exam-file-url").value.trim();
+
+            if (!fileUrl) return alert("Пожалуйста, введите ссылку на файл!");
+
+            try {
+                // Отправляем POST /projects/{id}/works
+                await api.submitWork(activeProject.id, fileUrl);
+
+                alert("✅ Работа успешно добавлена!");
+                uploadExamModal.style.display = "none";
+
+                // Подтягиваем свежий список работ с бэкенда
+                if (typeof loadProjectData === 'function') {
+                    await loadProjectData(activeProject.id);
+                }
+
+                // Перерисовываем интерфейс (таблицу)
+                updateDashboard();
+
+            } catch (error) {
+                console.error("Ошибка загрузки работы:", error);
+                alert("❌ Ошибка при отправке работы на сервер.");
+            }
+        };
+    }
     // ==========================================
     // 13. ЗАПУСК
     // ==========================================
