@@ -687,21 +687,30 @@ document.addEventListener("DOMContentLoaded", () => {
             const tableActions = document.querySelector('.table-actions');
 
             if (currentRole === 'organizer') {
+                // ПОКАЗЫВАЕМ ОРГАНИЗАТОРА
                 if (orgWorkspace) orgWorkspace.style.display = 'block';
+
+                // 1. Гарантированно показываем таблицы и статистику
+                if (statsGrid) statsGrid.style.display = 'grid';
+                if (tableContainer) tableContainer.style.display = 'block';
+                if (tableActions) tableActions.style.display = 'flex';
+
+                // 2. Умная проверка типа проекта (даже если бэкенд спрятал type в description)
                 const btnAddExamWork = document.getElementById("btn-add-exam-work");
                 if (btnAddExamWork) {
-                    if (activeProject && activeProject.type === 'exam') {
+                    const isExam = activeProject && (
+                        activeProject.type === 'exam' ||
+                        (activeProject.description && activeProject.description.includes('exam'))
+                    );
+
+                    if (isExam) {
                         btnAddExamWork.style.display = 'inline-block';
                     } else {
                         btnAddExamWork.style.display = 'none';
                     }
                 }
-                else {
-                    if (statsGrid) statsGrid.style.display = 'grid';
-                    if (tableContainer) tableContainer.style.display = 'block';
-                    if (tableActions) tableActions.style.display = 'flex';
-                }
 
+                // 3. Скрываем инструменты эксперта
                 if (expWorkspace) expWorkspace.style.display = 'none';
                 if (btnRequests) btnRequests.style.display = 'flex';
                 if (btnOpenControl) btnOpenControl.style.display = 'flex';
@@ -709,6 +718,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
                 if (typeof updateStatsCounters === 'function') updateStatsCounters();
                 if (typeof renderTable === 'function') renderTable();
+
             } else {
                 if (orgWorkspace) orgWorkspace.style.display = 'none';
                 else {
