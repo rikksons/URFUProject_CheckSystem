@@ -308,6 +308,27 @@
                 базу</button>
         </div>
     </div>
+    <!-- Модалка загрузки МОЕЙ работы (P2P / Эксперт) -->
+    <div id="upload-my-work-modal" class="modal" style="display: none;">
+        <div class="modal-content" style="max-width: 400px; min-height: auto;">
+            <span class="close-modal" id="close-upload-my-work">&times;</span>
+            <h3 style="margin-bottom: 20px;">Загрузить мою работу</h3>
+
+            <div class="form-group">
+                <label>Название работы</label>
+                <input type="text" id="my-work-title" placeholder="Например: Практика №1" class="input-field" value="">
+            </div>
+
+            <div class="form-group" style="margin-top: 15px;">
+                <label>Ссылка на файл (GitHub, Google Drive и т.д.)</label>
+                <input type="text" id="my-work-url" placeholder="https://..." class="input-field">
+            </div>
+
+            <button id="btn-submit-my-work" class="btn"
+                style="width: 100%; margin-top: 25px; background: var(--accent-blue); color: white;">Отправить на
+                проверку</button>
+        </div>
+    </div>
 </body>
 
 </html>

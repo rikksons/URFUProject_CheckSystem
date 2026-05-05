@@ -486,17 +486,47 @@ document.addEventListener("DOMContentLoaded", () => {
 
     async function loadProjectData(projectId) {
         try {
-            const worksResponse = await api.getProjectWorks(projectId);
-            const works = worksResponse.data || worksResponse;
+            const response = await api.getProjectWorks(projectId);
+            console.log("📦 Ответ сервера по работам:", response); // Выводим ответ для проверки
+
+            // 1. УМНАЯ РАСПАКОВКА
+            let rawWorks = [];
+            const payload = response.data || response.raw || response;
+
+            if (Array.isArray(payload)) {
+                rawWorks = payload;
+            } else if (payload && Array.isArray(payload.data)) {
+                rawWorks = payload.data;
+            } else if (payload && Array.isArray(payload.items)) {
+                rawWorks = payload.items;
+            }
+
+            console.log("✅ Распакованный массив работ:", rawWorks);
+
+            // 2. ПЕРЕВОДЧИК ДЛЯ ТАБЛИЦЫ
             if (activeProject) {
-                activeProject.submissions = Array.isArray(works) ? works : [];
+                activeProject.submissions = rawWorks.map(work => {
+                    return {
+                        id: work.id,
+                        name: work.title || 'Без названия',
+                        telegram: work.author_id ? `ID: ${work.author_id}` : '—',
+                        date: work.submitted_at ? new Date(work.submitted_at).toLocaleDateString() : new Date().toLocaleDateString(),
+                        status: work.status === 'done' ? 'done' : 'waiting',
+                        reviews: work.reviews || [],
+                        assignedExperts: work.assigned_experts || [],
+                        contentUrl: work.content || ''
+                    };
+                });
             }
         } catch (e) {
-            console.error("Ошибка загрузки работ:", e);
+            console.error("❌ Ошибка загрузки работ:", e);
             if (activeProject) activeProject.submissions = [];
         }
     }
 
+    // ==========================================
+    // 8. ЭКСПЕРТНАЯ ЧАСТЬ
+    // ==========================================
     // ==========================================
     // 8. ЭКСПЕРТНАЯ ЧАСТЬ
     // ==========================================
@@ -507,60 +537,125 @@ document.addEventListener("DOMContentLoaded", () => {
         workspace.innerHTML = "";
 
         if (activeProject.type === 'p2p') {
+            // Ищем загруженную работу текущего пользователя
             const myWork = activeProject.submissions?.find(s => s.telegram === currentUser.tg);
 
+            // ----------------------------------------------------
+            // СЦЕНАРИЙ 1: РАБОТА ЕЩЕ НЕ ЗАГРУЖЕНА
+            // ----------------------------------------------------
             if (!myWork) {
                 workspace.innerHTML = `
-                    <div style="text-align: center; padding: 60px; background: rgba(255,255,255,0.02); border: 2px dashed var(--border-color); border-radius: 12px;">
-                        <h2 style="margin-bottom: 15px;">Добро пожаловать в P2P проект!</h2>
-                        <p style="color: var(--text-muted); margin-bottom: 25px;">Сначала загрузите свою работу в систему.</p>
-                        <button class="btn" style="background: var(--accent-blue); color: white; padding: 12px 24px;" onclick="simulateP2PUpload()">📤 Загрузить мою работу</button>
+                    <h3 style="margin-bottom: 20px;">Моя работа (Peer-to-Peer)</h3>
+                    
+                    <div style="background: rgba(0,0,0,0.2); padding: 20px; border-radius: 8px; border: 1px dashed var(--border-color); margin-bottom: 20px;">
+                        <p style="color: var(--text-muted); margin-bottom: 15px;">Чтобы начать проверять других участников, вам необходимо сначала загрузить свою собственную работу.</p>
+                        <button id="btn-upload-my-work" class="btn" style="background: var(--accent-blue); color: white;">
+                            📥 Загрузить мою работу
+                        </button>
                     </div>
                 `;
-            } else {
-                const workToReview = activeProject.submissions?.find(sub =>
-                    sub.assignedExperts && sub.assignedExperts.includes(currentUser.name) && sub.telegram !== currentUser.tg
-                );
 
-                if (!workToReview) {
+                // Привязываем логику к кнопке
+                const btnUploadMyWork = document.getElementById("btn-upload-my-work");
+                const uploadMyWorkModal = document.getElementById("upload-my-work-modal");
+
+                if (btnUploadMyWork && uploadMyWorkModal) {
+                    btnUploadMyWork.onclick = () => {
+                        document.getElementById("my-work-url").value = "";
+                        uploadMyWorkModal.style.display = "flex";
+                    };
+                }
+
+                const closeUploadMyWork = document.getElementById("close-upload-my-work");
+                if (closeUploadMyWork) closeUploadMyWork.onclick = () => uploadMyWorkModal.style.display = "none";
+
+                const btnSubmitMyWork = document.getElementById("btn-submit-my-work");
+                if (btnSubmitMyWork) {
+                    btnSubmitMyWork.onclick = async () => {
+                        const title = document.getElementById("my-work-title").value.trim() || "P2P Работа";
+                        const fileUrl = document.getElementById("my-work-url").value.trim();
+
+                        if (!fileUrl) return alert("Пожалуйста, введите ссылку на работу!");
+
+                        try {
+                            await api.submitWork(activeProject.id, { title: title, content: fileUrl });
+                            alert("✅ Ваша работа успешно отправлена!");
+                            uploadMyWorkModal.style.display = "none";
+
+                            if (typeof loadProjectData === 'function') await loadProjectData(activeProject.id);
+                            updateDashboard();
+                        } catch (error) {
+                            console.error("Ошибка загрузки работы:", error);
+                            alert("❌ Ошибка при отправке работы. Проверьте консоль.");
+                        }
+                    };
+                }
+            }
+            // ----------------------------------------------------
+            // СЦЕНАРИЙ 2: РАБОТА ЗАГРУЖЕНА, ЖДЕМ ИЛИ ПРОВЕРЯЕМ
+            // ----------------------------------------------------
+            else {
+                // Ищем работы, которые назначили этому эксперту
+                const myAssignedWorks = activeProject.submissions?.filter(sub =>
+                    sub.assignedExperts && sub.assignedExperts.includes(currentUser.name)
+                ) || [];
+
+                if (myAssignedWorks.length === 0) {
+                    // А. Работ для проверки еще нет (Организатор не запустил алгоритм)
                     workspace.innerHTML = `
-                        <div style="text-align: center; padding: 40px;">
-                            <h3>✅ Ваша работа принята!</h3>
-                            <p style="color: var(--text-muted); margin-top: 10px;">Ожидайте, пока система назначит вам чужую работу для проверки.</p>
+                        <h3 style="margin-bottom: 20px;">Моя работа (Peer-to-Peer)</h3>
+                        <div style="background: rgba(16, 185, 129, 0.1); padding: 20px; border-radius: 8px; border: 1px dashed var(--status-green); margin-bottom: 20px; text-align: center;">
+                            <h4 style="color: var(--status-green); margin-bottom: 10px;">✅ Ваша работа успешно загружена!</h4>
+                            <p style="color: var(--text-muted);">Система пока не назначила вам работы для проверки. Ожидайте старта проверки организатором.</p>
                         </div>
                     `;
                 } else {
+                    // Б. Работы назначены, выводим таблицу
                     workspace.innerHTML = `
-                        <div style="display: flex; gap: 30px; align-items: flex-start;">
-                            <div style="flex: 2; background: var(--bg-dark); border: 1px solid var(--border-color); padding: 20px; border-radius: 8px;">
-                                <h4 style="color: var(--text-muted); margin-bottom: 15px;">Анонимная работа для проверки:</h4>
-                                <div style="width: 100%; height: 500px; background: #374151; display: flex; align-items: center; justify-content: center; color: #9ca3af; border: 1px dashed #4b5563; border-radius: 8px;">
-                                    [Скан или скриншот работы]
-                                </div>
-                            </div>
-                            <div style="flex: 1; background: var(--bg-dark); border: 1px solid var(--border-color); padding: 25px; border-radius: 8px;">
-                                <h3>Ваша оценка</h3>
-                                <div style="margin-top: 20px;">
-                                    <label style="display: block; font-size: 13px; color: var(--text-muted); margin-bottom: 8px;">Комментарий:</label>
-                                    <textarea id="exp-comment" style="width: 100%; height: 150px; background: rgba(0,0,0,0.3); border: 1px solid var(--border-color); color: white; border-radius: 6px; padding: 10px;"></textarea>
-                                    
-                                    <label style="display: block; font-size: 13px; color: var(--text-muted); margin-top: 20px; margin-bottom: 8px;">Оценка (0-10):</label>
-                                    <input type="number" id="exp-score" step="0.1" style="width: 100%; padding: 12px; background: rgba(0,0,0,0.3); border: 1px solid var(--border-color); color: var(--status-orange); font-weight: bold; font-size: 20px; text-align: center; border-radius: 6px;">
-                                    
-                                    <button class="btn" style="width: 100%; background: var(--status-green); color: white; margin-top: 25px;" onclick="saveExpertReview(${workToReview.id})">💾 Сохранить</button>
-                                </div>
-                            </div>
+                        <h3 style="margin-bottom: 20px;">Моя работа (Peer-to-Peer) <span style="font-size: 14px; color: var(--status-green); margin-left: 10px;">✅ Загружена</span></h3>
+                        <h3 style="margin-bottom: 20px; margin-top: 30px; border-top: 1px solid var(--border-color); padding-top: 20px;">Назначенные вам проверки:</h3>
+                        <div class="table-container">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Название работы</th>
+                                        <th>Дата сдачи</th>
+                                        <th>Ваш статус</th>
+                                        <th>Действия</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="expert-exam-body"></tbody>
+                            </table>
                         </div>
                     `;
+
+                    const tbody = document.getElementById("expert-exam-body");
+                    myAssignedWorks.forEach(sub => {
+                        const myReview = sub.reviews?.find(r => r.reviewerTg === currentUser.tg);
+                        const statusText = myReview ? `<span style="color: var(--status-green);">✅ Оценено (${myReview.score})</span>` : `<span style="color: var(--status-orange);">⏳ Ожидает проверки</span>`;
+
+                        const tr = document.createElement("tr");
+                        tr.innerHTML = `
+                            <td>${sub.name || 'Без названия'}</td>
+                            <td>${sub.date || '—'}</td>
+                            <td>${statusText}</td>
+                            <td class="action-cell">
+                                <span class="action-icon" onclick="openWorkModalById(${sub.id})" title="Просмотр">👁️</span>
+                                <span class="action-icon" onclick="openExpertEvaluateModal(${sub.id})" title="Оценить">💬</span>
+                            </td>
+                        `;
+                        if (tbody) tbody.appendChild(tr);
+                    });
                 }
             }
         } else {
+            // КОД ДЛЯ ЭКЗАМЕНА (остается без изменений)
             const myAssignedWorks = activeProject.submissions?.filter(sub =>
                 sub.assignedExperts && sub.assignedExperts.includes(currentUser.name)
             ) || [];
 
             workspace.innerHTML = `
-                <h3 style="margin-bottom: 20px;">Работы на проверку:</h3>
+                <h3 style="margin-bottom: 20px;">Работы на проверку (Экзамен):</h3>
                 <div class="table-container">
                     <table class="data-table">
                         <thead>
@@ -948,11 +1043,7 @@ document.addEventListener("DOMContentLoaded", () => {
             if (!nameInput?.trim()) return alert("Введите название проекта!");
 
             try {
-                await api.createProject({
-                    project_name: nameInput,
-                    description: `Проект типа ${typeInput}`,
-                    status: "active"
-                });
+                await api.createProject(nameInput, typeInput);
 
                 const nameInputField = document.getElementById("new-project-name");
                 if (nameInputField) nameInputField.value = "";
@@ -1197,7 +1288,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
             try {
                 // Отправляем POST /projects/{id}/works
-                await api.submitWork(activeProject.id, fileUrl);
+                await api.submitWork(activeProject.id, {
+                    title: "Экзаменационная работа",
+                    content: fileUrl
+                });
 
                 alert("✅ Работа успешно добавлена!");
                 uploadExamModal.style.display = "none";

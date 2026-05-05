@@ -1,4 +1,4 @@
-// js/api.js — ИСПРАВЛЕННАЯ ВЕРСИЯ
+// js/api.js — ИСПРАВЛЕННАЯ ВЕРСИЯ (Адаптация под новые JSON-схемы)
 const API_BASE_URL = "http://localhost:8000";
 
 const api = {
@@ -34,6 +34,10 @@ const api = {
 
         try {
             const response = await fetch(`${API_BASE_URL}${endpoint}`, config);
+
+            // Если сервер возвращает 204 No Content, просто выходим без парсинга JSON
+            if (response.status === 204) return { success: true };
+
             if (!response.ok) {
                 const err = await response.json().catch(() => ({}));
                 if (response.status === 401) this.clearToken();
@@ -70,27 +74,28 @@ const api = {
     },
     async getMe() { return await this.request("/auth/me"); },
 
-    // 1. ПОЛУЧЕНИЕ ПРОЕКТОВ (Переводим из БД во фронтенд)
+    // ==========================================
+    // 1. ПРОЕКТЫ И УЧАСТНИКИ
+    // ==========================================
     getProjects: async () => {
         const response = await api.request("/projects");
-        
-        // Выводим ответ сервера в консоль, чтобы подглядеть структуру
-        console.log("Ответ от сервера:", response); 
+        console.log("Ответ от сервера:", response);
 
-        // УМНАЯ РАСПАКОВКА: Ищем массив внутри ответа
+        // УМНАЯ РАСПАКОВКА (с учетом того, что api.request возвращает объект {success, data, raw})
         let rawProjects = [];
-        if (Array.isArray(response)) {
-            rawProjects = response; // Если сервер прислал чистый массив
-        } else if (response && Array.isArray(response.data)) {
-            rawProjects = response.data; // Если массив лежит в поле .data
-        } else if (response && Array.isArray(response.items)) {
-            rawProjects = response.items; // Если массив лежит в поле .items
+        const payload = response.data || response.raw || response;
+
+        if (Array.isArray(payload)) {
+            rawProjects = payload;
+        } else if (payload && Array.isArray(payload.data)) {
+            rawProjects = payload.data;
+        } else if (payload && Array.isArray(payload.items)) {
+            rawProjects = payload.items;
         } else {
-            console.error("Не удалось найти массив проектов в ответе сервера!");
+            console.error("Не удалось найти массив проектов в ответе сервера!", payload);
             return [];
         }
-        
-        // Перебираем каждый проект из базы и меняем названия полей
+
         return rawProjects.map(proj => {
             let parsedType = 'unknown';
             if (proj.description && proj.description.includes('p2p')) {
@@ -101,20 +106,18 @@ const api = {
 
             return {
                 id: proj.id,
-                name: proj.project_name,    
-                type: parsedType,           
-                code: proj.project_code,    
+                name: proj.project_name,
+                type: parsedType,
+                code: proj.project_code,
                 status: proj.status
             };
         });
     },
 
-    // 2. СОЗДАНИЕ ПРОЕКТА (Переводим с фронтенда в БД)
     createProject: (name, type) => {
-        // Отправляем данные так, как их ждет таблица в БД
         return api.request("/projects", "POST", {
             project_name: name,
-            description: `Проект типа ${type}` // Склеиваем обратно в строку для БД
+            description: `Проект типа ${type}`
         });
     },
 
@@ -122,33 +125,64 @@ const api = {
         return await this.request(`/projects/${projectId}`, "DELETE");
     },
 
-    // === Работы ===
+    // Новое: Вступление в проект
+    async joinProject(code) {
+        return await this.request(`/projects/join`, "POST", { code });
+    },
+
+    // Новое: Управление ролями участников
+    async updateMember(projectId, userId, role, permissions = [], status = "active") {
+        return await this.request(`/projects/${projectId}/members/${userId}`, "PATCH", {
+            role: role,
+            permissions: permissions,
+            status: status
+        });
+    },
+
+    // ==========================================
+    // 2. РАБОТЫ (Works)
+    // ==========================================
     async getProjectWorks(projectId) {
         return await this.request(`/projects/${projectId}/works`);
     },
+
     async submitWork(projectId, { title, content, iteration_id = null }) {
         return await this.request(`/projects/${projectId}/works`, "POST", {
             title, content, iteration_id
         });
     },
 
-    // === Итерации ===
+    // ==========================================
+    // 3. ИТЕРАЦИИ (Сборы)
+    // ==========================================
     async updateIterationStatus(projectId, iterationId, status) {
-        return await this.request(`/projects/${projectId}/iterations/${iterationId}`, "PATCH", { status });
+        // Подстроено под PATCH /projects/{id}/iterations/{it_id}
+        return await this.request(`/projects/${projectId}/iterations/${iterationId}`, "PATCH", {
+            status: status
+        });
     },
 
-    // === Назначения ===
+    // ==========================================
+    // 4. НАЗНАЧЕНИЯ (Assignments)
+    // ==========================================
     async assignRandomExperts(projectId, count) {
+        // Изменено: теперь используется algorithm и reviews_per_work вместо assignment_type
         return await this.request(`/projects/${projectId}/assignments`, "POST", {
-            assignment_type: "auto",
+            algorithm: "random",
             reviews_per_work: count
         });
     },
 
-    // === Рецензии ===
-    async submitReview(projectId, workId, { review, rating }) {
-        return await this.request(`/projects/${projectId}/works/${workId}/reviews`, "POST", {
-            review, rating
+    // ==========================================
+    // 5. РЕЦЕНЗИИ И ОЦЕНКИ
+    // ==========================================
+    async submitReview(workId, iterationId, score, comment, criteriaScores = []) {
+        // Изменено: URL теперь /works/{workId}/reviews, а поля отправляются согласно документации бэкенда
+        return await this.request(`/works/${workId}/reviews`, "POST", {
+            iteration_id: iterationId,
+            score: score,
+            comment: comment,
+            criteria_scores: criteriaScores
         });
     }
 };
