@@ -129,8 +129,16 @@ document.addEventListener("DOMContentLoaded", () => {
             iconEl.className = `project-icon large ${activeProject.type === 'p2p' ? 'blue' : 'green'}`;
         }
 
-        const typeEl = document.getElementById("header-type");
-        if (typeEl) typeEl.innerText = activeProject.type === 'p2p' ? "Peer-to-Peer" : "Экзаменационный";
+        let displayType = "Неизвестный тип";
+        if (activeProject.type === 'p2p') {
+            displayType = "Peer-to-Peer";
+        } else if (activeProject.type === 'exam') {
+            displayType = "Экзаменационный";
+        } else {
+            // Если пришла какая-то дичь (например, 'unknown'), покажем её как есть
+            displayType = String(activeProject.type).toUpperCase();
+        }
+        document.getElementById("header-type").innerText = displayType;
 
         const dateEl = document.getElementById("header-date");
         if (dateEl) dateEl.innerText = activeProject.date || '—';

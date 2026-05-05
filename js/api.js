@@ -16,13 +16,13 @@ const api = {
     // === Базовый запрос ===
     async request(endpoint, method = "GET", body = null) {
         const headers = { "Content-Type": "application/json" };
-        
+
         // 🔐 Добавляем токен из localStorage
         const token = this.getToken();
         if (token) {
             headers["Authorization"] = `Bearer ${token}`;
         }
-        
+
         // 🧪 Режим отладки: X-User-Id
         const debugId = localStorage.getItem("debug_user_id");
         if (debugId && !token) {
@@ -37,10 +37,10 @@ const api = {
             if (!response.ok) {
                 const err = await response.json().catch(() => ({}));
                 if (response.status === 401) this.clearToken();
-                
+
                 // Детальная ошибка валидации
                 if (response.status === 422 && err.detail) {
-                    const msg = Array.isArray(err.detail) 
+                    const msg = Array.isArray(err.detail)
                         ? err.detail.map(d => `${d.loc?.join('.')}: ${d.msg}`).join('; ')
                         : JSON.stringify(err.detail);
                     throw new Error(`Validation: ${msg}`);
@@ -70,20 +70,54 @@ const api = {
     },
     async getMe() { return await this.request("/auth/me"); },
 
-    // === Проекты — ИСПРАВЛЕНО: правильные имена полей ===
-    async getProjects(filters = {}) {
-        const params = new URLSearchParams(filters).toString();
-        return await this.request(`/projects${params ? `?${params}` : ""}`);
-    },
-    
-    async createProject({ project_name, description, status = "active" }) {
-        return await this.request("/projects", "POST", {
-            project_name,
-            description,
-            status
+    // 1. ПОЛУЧЕНИЕ ПРОЕКТОВ (Переводим из БД во фронтенд)
+    getProjects: async () => {
+        const response = await api.request("/projects");
+        
+        // Выводим ответ сервера в консоль, чтобы подглядеть структуру
+        console.log("Ответ от сервера:", response); 
+
+        // УМНАЯ РАСПАКОВКА: Ищем массив внутри ответа
+        let rawProjects = [];
+        if (Array.isArray(response)) {
+            rawProjects = response; // Если сервер прислал чистый массив
+        } else if (response && Array.isArray(response.data)) {
+            rawProjects = response.data; // Если массив лежит в поле .data
+        } else if (response && Array.isArray(response.items)) {
+            rawProjects = response.items; // Если массив лежит в поле .items
+        } else {
+            console.error("Не удалось найти массив проектов в ответе сервера!");
+            return [];
+        }
+        
+        // Перебираем каждый проект из базы и меняем названия полей
+        return rawProjects.map(proj => {
+            let parsedType = 'unknown';
+            if (proj.description && proj.description.includes('p2p')) {
+                parsedType = 'p2p';
+            } else if (proj.description && proj.description.includes('exam')) {
+                parsedType = 'exam';
+            }
+
+            return {
+                id: proj.id,
+                name: proj.project_name,    
+                type: parsedType,           
+                code: proj.project_code,    
+                status: proj.status
+            };
         });
     },
-    
+
+    // 2. СОЗДАНИЕ ПРОЕКТА (Переводим с фронтенда в БД)
+    createProject: (name, type) => {
+        // Отправляем данные так, как их ждет таблица в БД
+        return api.request("/projects", "POST", {
+            project_name: name,
+            description: `Проект типа ${type}` // Склеиваем обратно в строку для БД
+        });
+    },
+
     async deleteProject(projectId) {
         return await this.request(`/projects/${projectId}`, "DELETE");
     },
@@ -110,7 +144,7 @@ const api = {
             reviews_per_work: count
         });
     },
-    
+
     // === Рецензии ===
     async submitReview(projectId, workId, { review, rating }) {
         return await this.request(`/projects/${projectId}/works/${workId}/reviews`, "POST", {
