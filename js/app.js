@@ -90,9 +90,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
             const div = document.createElement("div");
             div.className = `project-item ${proj.id === activeProject?.id ? 'active' : ''}`;
-            const badgeHTML = proj.joinRequests && proj.joinRequests.length > 0
-                ? `<span class="badge orange" style="background: #ef4444; color:white;">${proj.joinRequests.length} заявки</span>`
-                : `<span class="badge ${proj.type === 'p2p' ? 'orange' : 'yellow'}">${(proj.type || 'unknown').toUpperCase()}</span>`;
+            const badgeHTML = `<span class="badge ${proj.type === 'p2p' ? 'orange' : 'yellow'}">${(proj.type || 'unknown').toUpperCase()}</span>`;
 
             const firstChar = proj.name ? proj.name.charAt(0) : '?';
             const projectName = (proj.name || 'Без названия').substring(0, 15);
@@ -174,6 +172,8 @@ document.addEventListener("DOMContentLoaded", () => {
                 (sub.telegram && sub.telegram.toLowerCase().includes(filter));
         });
 
+        console.log("📊 Рендер таблицы:", filteredSubmissions.length, "работ найдено");
+
         if (filteredSubmissions.length === 0) {
             tableBody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: var(--text-muted); padding: 30px;">Ничего не найдено</td></tr>`;
             return;
@@ -245,31 +245,41 @@ document.addEventListener("DOMContentLoaded", () => {
         if (!participantsList) return;
         participantsList.innerHTML = "";
 
-        if (!activeProject || !activeProject.experts || activeProject.experts.length === 0) {
+        // Извлекаем экспертов из рецензий (т.к. отдельного API для участников нет)
+        const expertsSet = new Set();
+        if (activeProject && activeProject.submissions) {
+            activeProject.submissions.forEach(sub => {
+                if (sub.reviews && Array.isArray(sub.reviews)) {
+                    sub.reviews.forEach(review => {
+                        if (review.reviewer_name) {
+                            expertsSet.add(JSON.stringify({
+                                name: review.reviewer_name,
+                                user_id: review.reviewer_id || Math.random()
+                            }));
+                        }
+                    });
+                }
+            });
+        }
+
+        if (expertsSet.size === 0) {
             participantsList.innerHTML = `<p style="color: var(--text-muted); font-size: 13px; text-align: center; margin-top: 20px;">Нет участников</p>`;
             return;
         }
 
-        activeProject.experts.forEach(exp => {
+        const experts = Array.from(expertsSet).map(exp => JSON.parse(exp));
+        experts.forEach(exp => {
             if (!exp) return;
 
             const div = document.createElement("div");
             div.className = "participant-item";
             div.innerHTML = `
-                <div class="avatar">${exp.initials || '??'}</div>
+                <div class="avatar">${(exp.name || '??').substring(0, 2).toUpperCase()}</div>
                 <div style="flex: 1;">
                     <div class="p-name">${exp.name || 'Unknown'}</div>
-                    <div class="p-tg" style="display: flex; justify-content: space-between; align-items: center;">
-                        ${exp.tg || '@unknown'}
-                        <span class="btn-participant-menu">⋮</span>
-                    </div>
-                    <div style="font-size: 11px; color: ${exp.role === 'Соорганизатор' ? '#3b82f6' : 'var(--text-muted)'}; font-weight: bold;">${exp.role || 'Участник'}</div>
+                    <div class="p-tg" style="font-size: 11px; color: var(--text-muted);">Рецензент</div>
                 </div>
             `;
-            const menuBtn = div.querySelector('.btn-participant-menu');
-            if (menuBtn && exp.tg) {
-                menuBtn.onclick = (e) => { e.stopPropagation(); showParticipantMenu(e, exp.tg); };
-            }
             participantsList.appendChild(div);
         });
     }
@@ -392,16 +402,20 @@ document.addEventListener("DOMContentLoaded", () => {
 
         if (submission.reviews && submission.reviews.length > 0) {
             submission.reviews.forEach((review) => {
+                const reviewerName = review.reviewer?.name || review.reviewer_name || 'Unknown';
+                const score = review.rating !== undefined ? review.rating : review.score;
+                const comment = review.review || review.comment;
+
                 htmlContent += `
                     <div class="review-card" style="margin-bottom: 10px; border: 1px solid var(--border-color);">
                         <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">
                             <div style="display: flex; align-items: center; gap: 10px;">
-                                <div class="avatar" style="width: 30px; height: 30px; font-size: 10px; background-color: #4b5563;">${(review.reviewerName || '??').substring(0, 2).toUpperCase()}</div>
-                                <div><div style="font-weight: bold; color: white; font-size: 14px;">${review.reviewerName || 'Unknown'}</div><div style="font-size: 12px; color: var(--text-muted);">${review.reviewerTg || '—'}</div></div>
+                                <div class="avatar" style="width: 30px; height: 30px; font-size: 10px; background-color: #4b5563;">${(reviewerName || '??').substring(0, 2).toUpperCase()}</div>
+                                <div><div style="font-weight: bold; color: white; font-size: 14px;">${reviewerName}</div><div style="font-size: 12px; color: var(--text-muted);">Рецензент</div></div>
                             </div>
-                            <div style="color: var(--status-orange); font-weight: bold;">Оценка: ⭐ ${(review.score || 0).toFixed(1)}</div>
+                            <div style="color: var(--status-orange); font-weight: bold;">Оценка: ⭐ ${(score || 0).toFixed(1)}</div>
                         </div>
-                        <p style="color: var(--text-main); font-size: 14px; margin-top: 10px; background: rgba(0,0,0,0.2); padding: 10px; border-radius: 6px;">${review.comment || 'Нет комментария'}</p>
+                        <p style="color: var(--text-main); font-size: 14px; margin-top: 10px; background: rgba(0,0,0,0.2); padding: 10px; border-radius: 6px;">${comment || 'Нет комментария'}</p>
                     </div>`;
             });
         } else { htmlContent += `<p style="color: var(--text-muted);">Нет доступных проверок.</p>`; }
@@ -466,11 +480,13 @@ document.addEventListener("DOMContentLoaded", () => {
         try {
             const meResponse = await api.getMe();
             currentUser = meResponse.data || meResponse;
+            console.log("👤 Текущий пользователь:", currentUser);
 
             const projectsResponse = await api.getProjects();
             projects = projectsResponse.data || projectsResponse;
 
             if (!Array.isArray(projects)) projects = [];
+            console.log("📁 Загруженные проекты:", projects);
 
             if (projects.length > 0) {
                 activeProject = projects[0];
@@ -479,7 +495,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
             updateDashboard();
         } catch (error) {
-            console.error("Ошибка инициализации:", error);
+            console.error("❌ Ошибка инициализации:", error);
             alert("Не удалось загрузить данные с сервера.");
         }
     }
@@ -487,36 +503,25 @@ document.addEventListener("DOMContentLoaded", () => {
     async function loadProjectData(projectId) {
         try {
             const response = await api.getProjectWorks(projectId);
-            console.log("📦 Ответ сервера по работам:", response); // Выводим ответ для проверки
+            console.log("📦 Ответ сервера по работам:", response);
 
-            // 1. УМНАЯ РАСПАКОВКА
-            let rawWorks = [];
-            const payload = response.data || response.raw || response;
-
-            if (Array.isArray(payload)) {
-                rawWorks = payload;
-            } else if (payload && Array.isArray(payload.data)) {
-                rawWorks = payload.data;
-            } else if (payload && Array.isArray(payload.items)) {
-                rawWorks = payload.items;
-            }
+            let rawWorks = response.data || response.raw || response;
+            if (!Array.isArray(rawWorks)) rawWorks = [];
 
             console.log("✅ Распакованный массив работ:", rawWorks);
 
-            // 2. ПЕРЕВОДЧИК ДЛЯ ТАБЛИЦЫ
             if (activeProject) {
-                activeProject.submissions = rawWorks.map(work => {
-                    return {
-                        id: work.id,
-                        name: work.title || 'Без названия',
-                        telegram: work.author_id ? `ID: ${work.author_id}` : '—',
-                        date: work.submitted_at ? new Date(work.submitted_at).toLocaleDateString() : new Date().toLocaleDateString(),
-                        status: work.status === 'done' ? 'done' : 'waiting',
-                        reviews: work.reviews || [],
-                        assignedExperts: work.assigned_experts || [],
-                        contentUrl: work.content || ''
-                    };
-                });
+                activeProject.submissions = rawWorks.map(work => ({
+                    id: work.id,
+                    name: work.title || 'Без названия',
+                    telegram: work.author_name || 'Unknown',
+                    date: work.created_at ? new Date(work.created_at).toLocaleDateString() : new Date().toLocaleDateString(),
+                    status: work.status === 'approved' ? 'done' : 'waiting',
+                    reviews: work.reviews || [],
+                    assignedExperts: work.assigned_experts || [],
+                    contentUrl: work.content || '',
+                    author_id: work.author_id
+                }));
             }
         } catch (e) {
             console.error("❌ Ошибка загрузки работ:", e);
@@ -537,8 +542,8 @@ document.addEventListener("DOMContentLoaded", () => {
         workspace.innerHTML = "";
 
         if (activeProject.type === 'p2p') {
-            // Ищем загруженную работу текущего пользователя
-            const myWork = activeProject.submissions?.find(s => s.telegram === currentUser.tg);
+            // Ищем загруженную работу текущего пользователя по автору
+            const myWork = activeProject.submissions?.find(s => s.author_id === currentUser.id);
 
             // ----------------------------------------------------
             // СЦЕНАРИЙ 1: РАБОТА ЕЩЕ НЕ ЗАГРУЖЕНА
@@ -592,60 +597,48 @@ document.addEventListener("DOMContentLoaded", () => {
                 }
             }
             // ----------------------------------------------------
-            // СЦЕНАРИЙ 2: РАБОТА ЗАГРУЖЕНА, ЖДЕМ ИЛИ ПРОВЕРЯЕМ
+            // СЦЕНАРИЙ 2: РАБОТА ЗАГРУЖЕНА, ВЫБИРАЕМ ЧУЖУЮ ДЛЯ ПРОВЕРКИ
             // ----------------------------------------------------
             else {
-                // Ищем работы, которые назначили этому эксперту
-                const myAssignedWorks = activeProject.submissions?.filter(sub =>
-                    sub.assignedExperts && sub.assignedExperts.includes(currentUser.name)
+                // Получаем все работы кроме своей
+                const otherWorks = activeProject.submissions?.filter(sub =>
+                    sub.id !== myWork.id && sub.author_id !== currentUser.id
                 ) || [];
 
-                if (myAssignedWorks.length === 0) {
-                    // А. Работ для проверки еще нет (Организатор не запустил алгоритм)
+                if (otherWorks.length === 0) {
+                    // Нет других работ для проверки
                     workspace.innerHTML = `
-                        <h3 style="margin-bottom: 20px;">Моя работа (Peer-to-Peer)</h3>
+                        <h3 style="margin-bottom: 20px;">Моя работа (Peer-to-Peer) <span style="font-size: 14px; color: var(--status-green); margin-left: 10px;">✅ Загружена</span></h3>
                         <div style="background: rgba(16, 185, 129, 0.1); padding: 20px; border-radius: 8px; border: 1px dashed var(--status-green); margin-bottom: 20px; text-align: center;">
                             <h4 style="color: var(--status-green); margin-bottom: 10px;">✅ Ваша работа успешно загружена!</h4>
-                            <p style="color: var(--text-muted);">Система пока не назначила вам работы для проверки. Ожидайте старта проверки организатором.</p>
+                            <p style="color: var(--text-muted);">В проекте пока нет других работ для проверки. Ожидайте, пока другие участники загрузят свои работы.</p>
                         </div>
                     `;
                 } else {
-                    // Б. Работы назначены, выводим таблицу
+                    // Выбираем одну случайную работу для проверки
+                    const randomWork = otherWorks[Math.floor(Math.random() * otherWorks.length)];
+
                     workspace.innerHTML = `
                         <h3 style="margin-bottom: 20px;">Моя работа (Peer-to-Peer) <span style="font-size: 14px; color: var(--status-green); margin-left: 10px;">✅ Загружена</span></h3>
-                        <h3 style="margin-bottom: 20px; margin-top: 30px; border-top: 1px solid var(--border-color); padding-top: 20px;">Назначенные вам проверки:</h3>
-                        <div class="table-container">
-                            <table class="data-table">
-                                <thead>
-                                    <tr>
-                                        <th>Название работы</th>
-                                        <th>Дата сдачи</th>
-                                        <th>Ваш статус</th>
-                                        <th>Действия</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="expert-exam-body"></tbody>
-                            </table>
+                        <h3 style="margin-bottom: 20px; margin-top: 30px; border-top: 1px solid var(--border-color); padding-top: 20px;">Работа для проверки:</h3>
+                        <div id="p2p-review-card" style="background: rgba(0,0,0,0.2); padding: 20px; border-radius: 8px; border: 1px solid var(--border-color); margin-bottom: 20px;">
+                            <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 15px;">
+                                <div>
+                                    <h4 style="color: white; margin: 0 0 5px 0;">${randomWork.name || 'Без названия'}</h4>
+                                    <p style="color: var(--text-muted); font-size: 13px; margin: 0;">
+                                        Автор: <strong>${randomWork.telegram || 'Unknown'}</strong> • Загружена: ${randomWork.date}
+                                    </p>
+                                </div>
+                                <div style="text-align: right;">
+                                    <p style="color: var(--status-orange); font-weight: bold; margin: 0;">⭐ Ожидает проверки</p>
+                                </div>
+                            </div>
+                            <div style="display: flex; gap: 10px;">
+                                <button class="btn btn-outline" onclick="openWorkModalById(${randomWork.id})" style="border-color: var(--accent-blue); color: var(--accent-blue);">👁️ Просмотреть</button>
+                                <button class="btn" onclick="openExpertEvaluateModal(${randomWork.id})" style="background: var(--status-green); color: white; flex: 1;">💬 Оценить работу</button>
+                            </div>
                         </div>
                     `;
-
-                    const tbody = document.getElementById("expert-exam-body");
-                    myAssignedWorks.forEach(sub => {
-                        const myReview = sub.reviews?.find(r => r.reviewerTg === currentUser.tg);
-                        const statusText = myReview ? `<span style="color: var(--status-green);">✅ Оценено (${myReview.score})</span>` : `<span style="color: var(--status-orange);">⏳ Ожидает проверки</span>`;
-
-                        const tr = document.createElement("tr");
-                        tr.innerHTML = `
-                            <td>${sub.name || 'Без названия'}</td>
-                            <td>${sub.date || '—'}</td>
-                            <td>${statusText}</td>
-                            <td class="action-cell">
-                                <span class="action-icon" onclick="openWorkModalById(${sub.id})" title="Просмотр">👁️</span>
-                                <span class="action-icon" onclick="openExpertEvaluateModal(${sub.id})" title="Оценить">💬</span>
-                            </td>
-                        `;
-                        if (tbody) tbody.appendChild(tr);
-                    });
                 }
             }
         } else {
@@ -716,17 +709,21 @@ document.addEventListener("DOMContentLoaded", () => {
         if (!comment || isNaN(score)) return alert("Заполните все поля!");
 
         try {
-            await api.submitReview(activeProject?.id, workId, { review: comment, rating: score });
-            alert("Проверка сохранена на сервере!");
+            console.log(`📝 Отправляем рецензию на работу #${workId}:`, { review: comment, rating: score });
+            await api.submitReview(workId, { review: comment, rating: score });
+            alert("✅ Проверка сохранена на сервере!");
 
             const modal = document.getElementById("exam-review-modal");
             if (modal) modal.style.display = 'none';
 
+            console.log("🔄 Перезагружаем данные проекта...");
             await loadProjectData(activeProject.id);
             updateDashboard();
+
+            console.log("✅ Интерфейс обновлен!");
         } catch (error) {
-            console.error(error);
-            alert("Ошибка при сохранении оценки на сервере.");
+            console.error("❌ Ошибка при сохранении оценки:", error);
+            alert("❌ Ошибка при сохранении оценки на сервере.");
         }
     };
 
@@ -735,7 +732,9 @@ document.addEventListener("DOMContentLoaded", () => {
         const sub = activeProject.submissions?.find(s => s.id === id);
         if (!sub) return;
 
-        const myReview = sub.reviews?.find(r => r.reviewerTg === currentUser?.tg);
+        const myReview = sub.reviews?.find(r => r.reviewer_id === currentUser?.id);
+        const reviewComment = myReview ? myReview.review : '';
+        const reviewScore = myReview ? myReview.rating : '';
 
         let modal = document.getElementById("exam-review-modal");
         if (!modal) {
@@ -750,8 +749,8 @@ document.addEventListener("DOMContentLoaded", () => {
                 <span class="close-modal" onclick="document.getElementById('exam-review-modal').style.display='none'">&times;</span>
                 <h3>Оценка работы</h3>
                 <p style="color: var(--text-muted); font-size: 13px; margin-bottom: 20px;">Проект: ${activeProject?.name || '—'}</p>
-                <textarea id="exam-comment" style="width: 100%; height: 120px; background: rgba(0,0,0,0.3); border: 1px solid var(--border-color); color: white; border-radius: 6px; padding: 10px;">${myReview ? myReview.comment : ''}</textarea>
-                <input type="number" id="exam-score" step="0.1" value="${myReview ? myReview.score : ''}" style="width: 100px; padding: 10px; margin-top: 15px; background: rgba(0,0,0,0.3); border: 1px solid var(--border-color); color: var(--status-orange); font-weight: bold; font-size: 16px; border-radius: 6px;">
+                <textarea id="exam-comment" style="width: 100%; height: 120px; background: rgba(0,0,0,0.3); border: 1px solid var(--border-color); color: white; border-radius: 6px; padding: 10px;">${reviewComment}</textarea>
+                <input type="number" id="exam-score" step="0.1" value="${reviewScore}" style="width: 100px; padding: 10px; margin-top: 15px; background: rgba(0,0,0,0.3); border: 1px solid var(--border-color); color: var(--status-orange); font-weight: bold; font-size: 16px; border-radius: 6px;">
                 <button class="btn" style="width: 100%; background: var(--status-green); color: white; margin-top: 20px;" onclick="saveExpertReview(${id})">💾 Сохранить проверку</button>
             </div>
         `;
@@ -777,11 +776,9 @@ document.addEventListener("DOMContentLoaded", () => {
             if (typeof renderSidebarProjects === 'function') renderSidebarProjects();
             if (typeof renderHeader === 'function') renderHeader();
             if (typeof renderExperts === 'function') renderExperts();
-            if (typeof updateRequestsBadge === 'function') updateRequestsBadge();
 
             const orgWorkspace = document.getElementById("organizer-workspace");
             const expWorkspace = document.getElementById("expert-workspace");
-            const btnRequests = document.getElementById("btn-requests");
             const btnOpenControl = document.getElementById("btn-open-control");
             const reviewPanelEl = document.getElementById("review-panel");
 
@@ -798,7 +795,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 if (tableContainer) tableContainer.style.display = 'block';
                 if (tableActions) tableActions.style.display = 'flex';
 
-                // 2. Умная проверка типа проекта (даже если бэкенд спрятал type в description)
+                // 2. Умная проверка типа проекта
                 const btnAddExamWork = document.getElementById("btn-add-exam-work");
                 if (btnAddExamWork) {
                     const isExam = activeProject && (
@@ -815,7 +812,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
                 // 3. Скрываем инструменты эксперта
                 if (expWorkspace) expWorkspace.style.display = 'none';
-                if (btnRequests) btnRequests.style.display = 'flex';
                 if (btnOpenControl) btnOpenControl.style.display = 'flex';
                 if (reviewPanelEl) reviewPanelEl.style.display = 'none';
 
@@ -831,7 +827,6 @@ document.addEventListener("DOMContentLoaded", () => {
                 }
 
                 if (expWorkspace) expWorkspace.style.display = 'block';
-                if (btnRequests) btnRequests.style.display = 'none';
                 if (btnOpenControl) btnOpenControl.style.display = 'none';
                 if (reviewPanelEl) reviewPanelEl.style.display = 'none';
 
@@ -1009,12 +1004,9 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     const btnRequestsEl = document.getElementById("btn-requests");
-    if (btnRequestsEl && requestsModal) {
-        btnRequestsEl.onclick = (e) => {
-            e.preventDefault();
-            renderRequestsModal();
-            if (requestsModal) requestsModal.style.display = 'flex';
-        };
+    if (btnRequestsEl) {
+        // Скрываем кнопку заявок, т.к. API их не поддерживает
+        btnRequestsEl.style.display = 'none';
     }
 
     const closeRequestsModal = document.getElementById("close-requests-modal");
@@ -1060,20 +1052,9 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     const btnInvite = document.getElementById("btn-invite");
-    if (btnInvite && inviteModal) {
-        btnInvite.onclick = () => {
-            const tgInput = document.getElementById("invite-tg-tag");
-            if (tgInput) tgInput.value = '';
-
-            const roleSelect = document.getElementById("invite-role");
-            if (roleSelect) {
-                roleSelect.innerHTML = `
-                    <option value="Эксперт">🎓 Эксперт</option>
-                    <option value="Соорганизатор">🛡️ Соорганизатор</option>
-                `;
-            }
-            inviteModal.style.display = 'flex';
-        };
+    if (btnInvite) {
+        // Скрываем кнопку приглашений, т.к. API управления участниками не полная
+        btnInvite.style.display = 'none';
     }
 
     const closeInviteModal = document.getElementById("close-invite-modal");

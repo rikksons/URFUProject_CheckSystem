@@ -79,9 +79,8 @@ const api = {
     // ==========================================
     getProjects: async () => {
         const response = await api.request("/projects");
-        console.log("Ответ от сервера:", response);
+        console.log("Ответ от сервера (проекты):", response);
 
-        // УМНАЯ РАСПАКОВКА (с учетом того, что api.request возвращает объект {success, data, raw})
         let rawProjects = [];
         const payload = response.data || response.raw || response;
 
@@ -92,26 +91,19 @@ const api = {
         } else if (payload && Array.isArray(payload.items)) {
             rawProjects = payload.items;
         } else {
-            console.error("Не удалось найти массив проектов в ответе сервера!", payload);
+            console.warn("Не удалось найти массив проектов", payload);
             return [];
         }
 
-        return rawProjects.map(proj => {
-            let parsedType = 'unknown';
-            if (proj.description && proj.description.includes('p2p')) {
-                parsedType = 'p2p';
-            } else if (proj.description && proj.description.includes('exam')) {
-                parsedType = 'exam';
-            }
-
-            return {
-                id: proj.id,
-                name: proj.project_name,
-                type: parsedType,
-                code: proj.project_code,
-                status: proj.status
-            };
-        });
+        return rawProjects.map(proj => ({
+            id: proj.id,
+            name: proj.project_name || 'Без названия',
+            type: (proj.description && proj.description.includes('p2p')) ? 'p2p' : 'exam',
+            code: proj.project_code || '',
+            status: proj.status || 'active',
+            description: proj.description || '',
+            created_at: proj.created_at
+        }));
     },
 
     createProject: (name, type) => {
@@ -143,7 +135,29 @@ const api = {
     // 2. РАБОТЫ (Works)
     // ==========================================
     async getProjectWorks(projectId) {
-        return await this.request(`/projects/${projectId}/works`);
+        const response = await this.request(`/projects/${projectId}/works`);
+        console.log("Ответ от сервера (работы):", response);
+
+        let rawWorks = [];
+        const payload = response.data || response.raw || response;
+
+        if (Array.isArray(payload)) {
+            rawWorks = payload;
+        } else if (payload && Array.isArray(payload.data)) {
+            rawWorks = payload.data;
+        } else if (payload && Array.isArray(payload.items)) {
+            rawWorks = payload.items;
+        }
+
+        return rawWorks.map(work => ({
+            id: work.id,
+            title: work.title || 'Без названия',
+            status: work.status || 'pending',
+            author_id: work.author?.user_id,
+            author_name: work.author?.name || 'Unknown',
+            created_at: work.created_at,
+            reviews: work.reviews || []
+        }));
     },
 
     async submitWork(projectId, { title, content, iteration_id = null }) {
@@ -165,24 +179,25 @@ const api = {
     // ==========================================
     // 4. НАЗНАЧЕНИЯ (Assignments)
     // ==========================================
-    async assignRandomExperts(projectId, count) {
-        // Изменено: теперь используется algorithm и reviews_per_work вместо assignment_type
+    async assignExpertsManual(projectId, assignments) {
+        // assignments = [ { work_id: 1, reviewer_id: 2 }, ... ]
         return await this.request(`/projects/${projectId}/assignments`, "POST", {
-            algorithm: "random",
-            reviews_per_work: count
+            assignment_type: "manual",
+            assignments: assignments
         });
+    },
+
+    async assignRandomExperts(projectId, assignments) {
+        return await this.assignExpertsManual(projectId, assignments);
     },
 
     // ==========================================
     // 5. РЕЦЕНЗИИ И ОЦЕНКИ
     // ==========================================
-    async submitReview(workId, iterationId, score, comment, criteriaScores = []) {
-        // Изменено: URL теперь /works/{workId}/reviews, а поля отправляются согласно документации бэкенда
+    async submitReview(workId, { review, rating }) {
         return await this.request(`/works/${workId}/reviews`, "POST", {
-            iteration_id: iterationId,
-            score: score,
-            comment: comment,
-            criteria_scores: criteriaScores
+            review: review,
+            rating: rating
         });
     }
 };
