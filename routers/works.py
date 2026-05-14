@@ -56,7 +56,11 @@ def list_works(
 
 # === Создать работу ===
 @router.post("/projects/{project_id}/works", response_model=APIResponse, status_code=201)
+<<<<<<< HEAD
 def submit_work(project_id: int,  WorkCreate, user: dict = Depends(get_current_user)):
+=======
+def submit_work(project_id: int, data: WorkCreate, user: dict = Depends(get_current_user)):
+>>>>>>> 5070319 (fix: исправлена авторизация, обновлены api.js и app.js, добавлен)
     project = db.find_one("Projects", "id", project_id)
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
@@ -91,7 +95,11 @@ def get_work(work_id: int, user: dict = Depends(get_current_user)):
 
 # === Обновление работы ===
 @router.patch("/works/{work_id}", response_model=APIResponse)
+<<<<<<< HEAD
 def update_work(work_id: int,  WorkUpdate, user: dict = Depends(get_current_user)):
+=======
+def update_work(work_id: int, data: WorkUpdate, user: dict = Depends(get_current_user)):
+>>>>>>> 5070319 (fix: исправлена авторизация, обновлены api.js и app.js, добавлен)
     work = db.find_one("Works", "id", work_id)
     if not work:
         raise HTTPException(status_code=404, detail="Work not found")

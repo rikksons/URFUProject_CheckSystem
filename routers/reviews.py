@@ -199,7 +199,11 @@ def get_results(project_id: int, user: dict = Depends(get_current_user)):
 @router.get("/export")
 def export_data(
     project_id: int, 
+<<<<<<< HEAD
     format: str = Query("xlsx", regex="^(pdf|xlsx)$"),
+=======
+    format: str = Query("xlsx", pattern="^(pdf|xlsx)$"),
+>>>>>>> 5070319 (fix: исправлена авторизация, обновлены api.js и app.js, добавлен)
     user: dict = Depends(get_current_user)
 ):
     project = db.find_one("Projects", "id", project_id)

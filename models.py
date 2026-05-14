@@ -146,4 +146,27 @@ class WorkResult(BaseModel):
 
 class ResultsResponse(BaseModel):
     project_id: int
+<<<<<<< HEAD
     results: List[WorkResult]
+=======
+    results: List[WorkResult]
+
+class UserRegister(BaseModel):
+    email: str = Field(..., pattern=r'^[\w\.-]+@[\w\.-]+\.\w+$')  # ← regex → pattern
+    password: str = Field(..., min_length=6)
+    name: str
+    telegramtag: Optional[str] = None
+
+class UserLogin(BaseModel):
+    email: str
+    password: str
+
+class TokenResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    user: UserProfile  # из предыдущих моделей
+
+class TokenData(BaseModel):
+    user_id: Optional[int] = None
+    email: Optional[str] = None
+>>>>>>> 5070319 (fix: исправлена авторизация, обновлены api.js и app.js, добавлен)

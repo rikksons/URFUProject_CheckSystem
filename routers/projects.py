@@ -43,7 +43,11 @@ def list_projects(
 
 @router.post("", response_model=APIResponse)
 def create_project(
+<<<<<<< HEAD
      ProjectCreate, 
+=======
+    data: ProjectCreate,  # <-- ИСПРАВЛЕНО
+>>>>>>> 5070319 (fix: исправлена авторизация, обновлены api.js и app.js, добавлен)
     user: dict = Depends(get_current_user)
 ):
     new_id = db.get_next_id("Projects")
@@ -52,7 +56,11 @@ def create_project(
     row = {
         "id": new_id,
         "owner_id": user.get("id"),
+<<<<<<< HEAD
         "project_name": data.project_name,
+=======
+        "project_name": data.project_name,  # теперь data существует
+>>>>>>> 5070319 (fix: исправлена авторизация, обновлены api.js и app.js, добавлен)
         "description": data.description,
         "project_code": project_code,
         "status": data.status,
@@ -69,7 +77,11 @@ def create_project(
 
 @router.post("/join", response_model=APIResponse)
 def join_project(
+<<<<<<< HEAD
      ProjectJoin, 
+=======
+    data: ProjectJoin,  # <-- ИСПРАВЛЕНО
+>>>>>>> 5070319 (fix: исправлена авторизация, обновлены api.js и app.js, добавлен)
     user: dict = Depends(get_current_user)
 ):
     # Ищем проект по project_code
