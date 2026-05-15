@@ -199,6 +199,10 @@ const api = {
             review: review,
             rating: rating
         });
+    },
+
+    async resetWorkReviews(projectId, workId) {
+        return await this.request(`/projects/${projectId}/works/${workId}/reset`, "POST");
     }
 };
 

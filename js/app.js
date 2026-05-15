@@ -9,7 +9,7 @@ document.addEventListener("DOMContentLoaded", () => {
     // Проверяет, назначена ли работа текущему пользователю
     function isAssignedToCurrentUser(sub) {
         if (!sub || !sub.assignedExperts) return false;
-            const candidates = (sub.assignedExperts || []).map(a => (a && typeof a === 'object') ? (a.name || String(a.user_id || '')) : String(a || ''));
+        const candidates = (sub.assignedExperts || []).map(a => (a && typeof a === 'object') ? (a.name || String(a.user_id || '')) : String(a || ''));
         const userIdentifiers = [String(currentUser?.name || ''), String(currentUser?.id || ''), String(currentUser?.tg || ''), String(currentUser?.telegramtag || '')].filter(Boolean);
         return candidates.some(c => userIdentifiers.includes(c));
     }
@@ -175,7 +175,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
         const filter = (typeof searchQuery === 'string') ? searchQuery.toLowerCase() : "";
         const submissions = activeProject.submissions || [];
-            const filteredSubmissions = submissions.filter(sub => (sub.name && sub.name.toLowerCase().includes(filter)) || (sub.telegram && sub.telegram.toLowerCase().includes(filter)));
+        const filteredSubmissions = submissions.filter(sub => (sub.name && sub.name.toLowerCase().includes(filter)) || (sub.telegram && sub.telegram.toLowerCase().includes(filter)));
 
         console.log("📊 Рендер таблицы:", filteredSubmissions.length, "работ найдено");
 
@@ -693,9 +693,9 @@ document.addEventListener("DOMContentLoaded", () => {
                 if (tbody) tbody.innerHTML = `<tr><td colspan="4" style="text-align: center; padding: 30px; color: var(--text-muted);">У вас нет назначенных работ.</td></tr>`;
             } else {
                 myAssignedWorks.forEach(sub => {
-const myReview = sub.reviews?.find(r => r.reviewer?.user_id === currentUser?.id || r.reviewer_id === currentUser?.id || r.reviewerTg === currentUser?.tg);
-                        const reviewScore = myReview ? (myReview.rating ?? myReview.score ?? 0) : null;
-                        const statusText = myReview ? `<span style="color: var(--status-green);">✅ Оценено (${reviewScore})</span>` : `<span style="color: var(--status-orange);">⏳ Ожидает проверки</span>`;
+                    const myReview = sub.reviews?.find(r => r.reviewer?.user_id === currentUser?.id || r.reviewer_id === currentUser?.id || r.reviewerTg === currentUser?.tg);
+                    const reviewScore = myReview ? (myReview.rating ?? myReview.score ?? 0) : null;
+                    const statusText = myReview ? `<span style="color: var(--status-green);">✅ Оценено (${reviewScore})</span>` : `<span style="color: var(--status-orange);">⏳ Ожидает проверки</span>`;
 
                     const tr = document.createElement("tr");
                     tr.innerHTML = `
@@ -773,8 +773,10 @@ const myReview = sub.reviews?.find(r => r.reviewer?.user_id === currentUser?.id 
                 <span class="close-modal" onclick="document.getElementById('exam-review-modal').style.display='none'">&times;</span>
                 <h3>Оценка работы</h3>
                 <p style="color: var(--text-muted); font-size: 13px; margin-bottom: 20px;">Проект: ${activeProject?.name || '—'}</p>
-                <textarea id="exam-comment" style="width: 100%; height: 120px; background: rgba(0,0,0,0.3); border: 1px solid var(--border-color); color: white; border-radius: 6px; padding: 10px;">${reviewComment}</textarea>
-                <input type="number" id="exam-score" step="0.1" value="${reviewScore}" style="width: 100px; padding: 10px; margin-top: 15px; background: rgba(0,0,0,0.3); border: 1px solid var(--border-color); color: var(--status-orange); font-weight: bold; font-size: 16px; border-radius: 6px;">
+                <label style="display: block; font-size: 12px; color: var(--text-muted); margin-bottom: 8px;">Комментарий:</label>
+                <textarea id="exam-comment" placeholder="Введите комментарий к работе..." style="width: 100%; height: 120px; background: rgba(0,0,0,0.3); border: 1px solid var(--border-color); color: white; border-radius: 6px; padding: 10px;">${reviewComment}</textarea>
+                <label style="display: block; font-size: 12px; color: var(--text-muted); margin: 15px 0 8px 0;">Оценка (1-10):</label>
+                <input type="number" id="exam-score" step="0.1" min="1" max="10" value="${reviewScore}" placeholder="Оценка" style="width: 100px; padding: 10px; background: rgba(0,0,0,0.3); border: 1px solid var(--border-color); color: var(--status-orange); font-weight: bold; font-size: 16px; border-radius: 6px;">
                 <button class="btn" style="width: 100%; background: var(--status-green); color: white; margin-top: 20px;" onclick="saveExpertReview(${id})">💾 Сохранить проверку</button>
             </div>
         `;
@@ -896,14 +898,23 @@ const myReview = sub.reviews?.find(r => r.reviewer?.user_id === currentUser?.id 
 
     const btnResetSingle = document.getElementById("reset-single-action");
     if (btnResetSingle) {
-        btnResetSingle.onclick = () => {
+        btnResetSingle.onclick = async () => {
             if (!activeProject) return;
             const sub = activeProject.submissions?.find(s => s.id === currentSelectedSubmissionId);
-            if (sub && confirm(`Сбросить результаты для ${sub.name}?`)) {
-                sub.reviews = [];
-                sub.status = 'checking';
-                renderTable();
-                updateStatsCounters();
+            if (sub && confirm(`Сбросить все проверки для работы "${sub.name}"? Это действие удалит существующие оценки и переоткроет задания для экспертов.`)) {
+                try {
+                    await api.resetWorkReviews(activeProject.id, sub.id);
+                    alert('Проверки для работы успешно сброшены.');
+
+                    if (contextMenu) contextMenu.style.display = 'none';
+
+                    await loadProjectData(activeProject.id);
+                    updateDashboard();
+
+                } catch (error) {
+                    console.error("Ошибка при сбросе проверок:", error);
+                    alert(`Не удалось сбросить проверки: ${error.message || 'Проверьте консоль для деталей.'}`);
+                }
             }
         };
     }
