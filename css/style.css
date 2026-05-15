@@ -31,18 +31,94 @@ body {
 }
 
 /* Сайдбары */
-.sidebar-left,
-.sidebar-right {
+.sidebar-left {
     background-color: var(--bg-panel);
-    width: 260px;
+    width: 300px;
+    flex: 0 0 300px;
     padding: 20px;
     border-right: 1px solid var(--border-color);
     overflow-y: auto;
+    transition: margin-left 0.3s ease;
+}
+
+.sidebar-left.collapsed {
+    margin-left: -300px;
 }
 
 .sidebar-right {
-    border-right: none;
+    background-color: var(--bg-panel);
+    width: 300px;
+    flex: 0 0 300px;
+    padding: 20px;
     border-left: 1px solid var(--border-color);
+    overflow-y: auto;
+    transition: margin-right 0.3s ease;
+}
+
+.sidebar-right.collapsed {
+    margin-right: -300px;
+}
+
+/* Кнопка переключения правого сайдбара */
+.sidebar-right-toggle-btn {
+    position: fixed;
+    top: 50%;
+    margin-top: -30px;
+    right: 300px;
+    width: 32px;
+    height: 60px;
+    background: var(--bg-panel);
+    border: 1px solid var(--border-color);
+    border-right: none;
+    color: var(--text-muted);
+    border-radius: 12px 0 0 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 1000;
+    transition: right 0.3s ease, color 0.2s, background-color 0.2s;
+    box-shadow: -4px 0 8px rgba(0, 0, 0, 0.2);
+}
+
+.sidebar-right-toggle-btn:hover {
+    background: var(--bg-card);
+    color: var(--text-main);
+}
+
+.sidebar-right-toggle-btn.collapsed {
+    right: 0;
+}
+
+/* Кнопка переключения сайдбара */
+.sidebar-toggle-btn {
+    position: fixed;
+    top: 50%;
+    margin-top: -30px;
+    left: 300px;
+    width: 32px;
+    height: 60px;
+    background: var(--bg-panel);
+    border: 1px solid var(--border-color);
+    border-left: none;
+    color: var(--text-muted);
+    border-radius: 0 12px 12px 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 1000;
+    transition: left 0.3s ease, color 0.2s, background-color 0.2s;
+    box-shadow: 4px 0 8px rgba(0, 0, 0, 0.2);
+}
+
+.sidebar-toggle-btn:hover {
+    background: var(--bg-card);
+    color: var(--text-main);
+}
+
+.sidebar-toggle-btn.collapsed {
+    left: 0;
 }
 
 .search-bar input {
@@ -139,7 +215,7 @@ body {
 /* Основной контент */
 .main-content {
     flex: 1;
-    padding: 30px;
+    padding: 30px 50px;
     overflow-y: auto;
 }
 

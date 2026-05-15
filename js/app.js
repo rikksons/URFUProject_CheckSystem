@@ -6,6 +6,38 @@ document.addEventListener("DOMContentLoaded", () => {
     let activeProject = null;
     let currentUser = null;
 
+    // === ДОБАВЛЕННЫЙ БЛОК: Кнопка сворачивания проектов ===
+    const sidebarLeft = document.querySelector('.sidebar-left');
+    if (sidebarLeft) {
+        const toggleBtn = document.createElement('button');
+        toggleBtn.className = 'sidebar-toggle-btn';
+        toggleBtn.innerHTML = '📁';
+        toggleBtn.title = 'Свернуть/Развернуть панель проектов';
+        document.body.appendChild(toggleBtn);
+
+        toggleBtn.onclick = () => {
+            sidebarLeft.classList.toggle('collapsed');
+            toggleBtn.classList.toggle('collapsed');
+        };
+    }
+
+    // === ДОБАВЛЕННЫЙ БЛОК: Кнопка сворачивания участников ===
+    const sidebarRight = document.querySelector('.sidebar-right');
+    if (sidebarRight) {
+        sidebarRight.classList.add('collapsed'); // Скрываем панель по умолчанию
+
+        const toggleRightBtn = document.createElement('button');
+        toggleRightBtn.className = 'sidebar-right-toggle-btn collapsed'; // Синхронизируем состояние кнопки
+        toggleRightBtn.innerHTML = '👥';
+        toggleRightBtn.title = 'Свернуть/Развернуть панель участников';
+        document.body.appendChild(toggleRightBtn);
+
+        toggleRightBtn.onclick = () => {
+            sidebarRight.classList.toggle('collapsed');
+            toggleRightBtn.classList.toggle('collapsed');
+        };
+    }
+
     // Проверяет, назначена ли работа текущему пользователю
     function isAssignedToCurrentUser(sub) {
         if (!sub || !sub.assignedExperts) return false;
@@ -83,7 +115,7 @@ document.addEventListener("DOMContentLoaded", () => {
     // ==========================================
     // 3. ФУНКЦИИ РЕНДЕРА
     // ==========================================
-    function renderSidebarProjects() {
+    function renderSidebarProjects(searchQuery = "") {
         const container = document.querySelector(".projects-list");
         if (!container) return;
 
@@ -93,20 +125,24 @@ document.addEventListener("DOMContentLoaded", () => {
 
         if (!Array.isArray(projects)) projects = [];
 
+        const filter = (typeof searchQuery === 'string') ? searchQuery.toLowerCase() : "";
+
         projects.forEach(proj => {
             if (!proj) return;
+            if (filter && (!proj.name || !proj.name.toLowerCase().includes(filter))) return;
 
             const div = document.createElement("div");
             div.className = `project-item ${proj.id === activeProject?.id ? 'active' : ''}`;
             const badgeHTML = `<span class="badge ${proj.type === 'p2p' ? 'orange' : 'yellow'}">${(proj.type || 'unknown').toUpperCase()}</span>`;
 
             const firstChar = proj.name ? proj.name.charAt(0) : '?';
-            const projectName = (proj.name || 'Без названия').substring(0, 15);
+            const fullName = proj.name || 'Без названия';
+            const projectName = fullName.length > 20 ? fullName.substring(0, 20) + '...' : fullName;
 
             div.innerHTML = `
                 <div class="project-icon ${proj.type === 'p2p' ? 'blue' : 'green'}">${firstChar}</div>
                 <div class="project-info" style="width: 100%;">
-                    <div class="project-name">${projectName}... ${badgeHTML}</div>
+                    <div class="project-name">${projectName} ${badgeHTML}</div>
                     <div class="project-meta">📄 ${proj.submissions?.length || 0} 👥 ${proj.experts?.length || 0}</div>
                 </div>
             `;
@@ -813,7 +849,9 @@ document.addEventListener("DOMContentLoaded", () => {
                 return;
             }
 
-            if (typeof renderSidebarProjects === 'function') renderSidebarProjects();
+            const projectSearchInput = document.querySelector('.sidebar-left .search-bar input');
+            const projectSearchVal = projectSearchInput ? projectSearchInput.value : "";
+            if (typeof renderSidebarProjects === 'function') renderSidebarProjects(projectSearchVal);
             if (typeof renderHeader === 'function') renderHeader();
             if (typeof renderExperts === 'function') renderExperts();
 
@@ -999,6 +1037,14 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const searchInput = document.querySelector('.table-actions input');
     if (searchInput) searchInput.oninput = (e) => renderTable(e.target.value);
+
+    // Обработчик для поиска по проектам
+    const projectSearchInput = document.querySelector('.sidebar-left .search-bar input');
+    if (projectSearchInput) {
+        projectSearchInput.oninput = (e) => {
+            if (typeof renderSidebarProjects === 'function') renderSidebarProjects(e.target.value);
+        };
+    }
 
     const btnOpenControl = document.getElementById("btn-open-control");
     if (btnOpenControl && controlModal) {
