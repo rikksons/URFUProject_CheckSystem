@@ -194,8 +194,8 @@ const api = {
     // ==========================================
     // 5. РЕЦЕНЗИИ И ОЦЕНКИ
     // ==========================================
-    async submitReview(workId, { review, rating }) {
-        return await this.request(`/works/${workId}/reviews`, "POST", {
+    async submitReview(projectId, workId, { review, rating }) {
+        return await this.request(`/projects/${projectId}/works/${workId}/reviews`, "POST", {
             review: review,
             rating: rating
         });

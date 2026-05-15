@@ -5,6 +5,14 @@ document.addEventListener("DOMContentLoaded", () => {
     let projects = [];
     let activeProject = null;
     let currentUser = null;
+
+    // Проверяет, назначена ли работа текущему пользователю
+    function isAssignedToCurrentUser(sub) {
+        if (!sub || !sub.assignedExperts) return false;
+            const candidates = (sub.assignedExperts || []).map(a => (a && typeof a === 'object') ? (a.name || String(a.user_id || '')) : String(a || ''));
+        const userIdentifiers = [String(currentUser?.name || ''), String(currentUser?.id || ''), String(currentUser?.tg || ''), String(currentUser?.telegramtag || '')].filter(Boolean);
+        return candidates.some(c => userIdentifiers.includes(c));
+    }
     let activeIterationId = "it_1";
     let currentRole = 'organizer';
     let isSelectionMode = false;
@@ -167,10 +175,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
         const filter = (typeof searchQuery === 'string') ? searchQuery.toLowerCase() : "";
         const submissions = activeProject.submissions || [];
-        const filteredSubmissions = submissions.filter(sub => {
-            return (sub.name && sub.name.toLowerCase().includes(filter)) ||
-                (sub.telegram && sub.telegram.toLowerCase().includes(filter));
-        });
+            const filteredSubmissions = submissions.filter(sub => (sub.name && sub.name.toLowerCase().includes(filter)) || (sub.telegram && sub.telegram.toLowerCase().includes(filter)));
 
         console.log("📊 Рендер таблицы:", filteredSubmissions.length, "работ найдено");
 
@@ -251,10 +256,12 @@ document.addEventListener("DOMContentLoaded", () => {
             activeProject.submissions.forEach(sub => {
                 if (sub.reviews && Array.isArray(sub.reviews)) {
                     sub.reviews.forEach(review => {
-                        if (review.reviewer_name) {
+                        const reviewerName = review.reviewer?.name || review.reviewer_name;
+                        const reviewerId = review.reviewer?.user_id || review.reviewer_id;
+                        if (reviewerName) {
                             expertsSet.add(JSON.stringify({
-                                name: review.reviewer_name,
-                                user_id: review.reviewer_id || Math.random()
+                                name: reviewerName,
+                                user_id: reviewerId || Math.random()
                             }));
                         }
                     });
@@ -514,11 +521,11 @@ document.addEventListener("DOMContentLoaded", () => {
                 activeProject.submissions = rawWorks.map(work => ({
                     id: work.id,
                     name: work.title || 'Без названия',
-                    telegram: work.author_name || 'Unknown',
+                    telegram: work.author_name || work.author?.name || 'Unknown',
                     date: work.created_at ? new Date(work.created_at).toLocaleDateString() : new Date().toLocaleDateString(),
-                    status: work.status === 'approved' ? 'done' : 'waiting',
+                    status: ['approved', 'success'].includes(work.status) ? 'done' : 'waiting',
                     reviews: work.reviews || [],
-                    assignedExperts: work.assigned_experts || [],
+                    assignedExperts: (work.assigned_experts || []).map(a => (a && typeof a === 'object') ? (a.name || String(a.user_id || '')) : String(a || '')),
                     contentUrl: work.content || '',
                     author_id: work.author_id
                 }));
@@ -602,7 +609,8 @@ document.addEventListener("DOMContentLoaded", () => {
             else {
                 // Получаем все работы кроме своей
                 const otherWorks = activeProject.submissions?.filter(sub =>
-                    sub.id !== myWork.id && sub.author_id !== currentUser.id
+                    sub.id !== myWork.id && sub.author_id !== currentUser.id &&
+                    !sub.reviews?.some(r => r.reviewer?.user_id === currentUser?.id || r.reviewer_id === currentUser?.id || r.reviewerTg === currentUser?.tg)
                 ) || [];
 
                 if (otherWorks.length === 0) {
@@ -643,9 +651,25 @@ document.addEventListener("DOMContentLoaded", () => {
             }
         } else {
             // КОД ДЛЯ ЭКЗАМЕНА (остается без изменений)
-            const myAssignedWorks = activeProject.submissions?.filter(sub =>
-                sub.assignedExperts && sub.assignedExperts.includes(currentUser.name)
+            let myAssignedWorks = activeProject.submissions?.filter(sub =>
+                isAssignedToCurrentUser(sub) &&
+                !sub.reviews?.some(r => r.reviewer?.user_id === currentUser?.id || r.reviewer_id === currentUser?.id || r.reviewerTg === currentUser?.tg)
             ) || [];
+
+            // Если у эксперта нет назначенных работ — попробуем локально назначить одну незанятую работу
+            if ((!myAssignedWorks || myAssignedWorks.length === 0) && activeProject.submissions && activeProject.submissions.length > 0) {
+                const reqReviews = activeProject.requiredReviews || 2;
+                const candidate = activeProject.submissions.find(s =>
+                    s.author_id !== currentUser.id &&
+                    !s.reviews?.some(r => r.reviewer?.user_id === currentUser?.id || r.reviewer_id === currentUser?.id) &&
+                    (s.assignedExperts?.length || 0) < reqReviews
+                );
+                if (candidate) {
+                    if (!candidate.assignedExperts) candidate.assignedExperts = [];
+                    candidate.assignedExperts.push(String(currentUser.name || currentUser.id));
+                    myAssignedWorks = [candidate];
+                }
+            }
 
             workspace.innerHTML = `
                 <h3 style="margin-bottom: 20px;">Работы на проверку (Экзамен):</h3>
@@ -669,8 +693,9 @@ document.addEventListener("DOMContentLoaded", () => {
                 if (tbody) tbody.innerHTML = `<tr><td colspan="4" style="text-align: center; padding: 30px; color: var(--text-muted);">У вас нет назначенных работ.</td></tr>`;
             } else {
                 myAssignedWorks.forEach(sub => {
-                    const myReview = sub.reviews?.find(r => r.reviewerTg === currentUser.tg);
-                    const statusText = myReview ? `<span style="color: var(--status-green);">✅ Оценено (${myReview.score})</span>` : `<span style="color: var(--status-orange);">⏳ Ожидает проверки</span>`;
+const myReview = sub.reviews?.find(r => r.reviewer?.user_id === currentUser?.id || r.reviewer_id === currentUser?.id || r.reviewerTg === currentUser?.tg);
+                        const reviewScore = myReview ? (myReview.rating ?? myReview.score ?? 0) : null;
+                        const statusText = myReview ? `<span style="color: var(--status-green);">✅ Оценено (${reviewScore})</span>` : `<span style="color: var(--status-orange);">⏳ Ожидает проверки</span>`;
 
                     const tr = document.createElement("tr");
                     tr.innerHTML = `
@@ -710,7 +735,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
         try {
             console.log(`📝 Отправляем рецензию на работу #${workId}:`, { review: comment, rating: score });
-            await api.submitReview(workId, { review: comment, rating: score });
+            await api.submitReview(activeProject.id, workId, { review: comment, rating: score });
             alert("✅ Проверка сохранена на сервере!");
 
             const modal = document.getElementById("exam-review-modal");
@@ -732,10 +757,9 @@ document.addEventListener("DOMContentLoaded", () => {
         const sub = activeProject.submissions?.find(s => s.id === id);
         if (!sub) return;
 
-        const myReview = sub.reviews?.find(r => r.reviewer_id === currentUser?.id);
-        const reviewComment = myReview ? myReview.review : '';
-        const reviewScore = myReview ? myReview.rating : '';
-
+        const myReview = sub.reviews?.find(r => r.reviewer?.user_id === currentUser?.id || r.reviewer_id === currentUser?.id || r.reviewerTg === currentUser?.tg);
+        const reviewComment = myReview ? (myReview.review || myReview.comment) : '';
+        const reviewScore = myReview ? (myReview.rating ?? myReview.score ?? '') : '';
         let modal = document.getElementById("exam-review-modal");
         if (!modal) {
             modal = document.createElement("div");
