@@ -133,6 +133,10 @@ const api = {
         return await this.request(`/projects/join`, "POST", { code });
     },
 
+    async getProjectMembers(projectId) {
+        return await this.request(`/projects/${projectId}/members`);
+    },
+
     // Новое: Управление ролями участников
     async updateMember(projectId, userId, role, permissions = [], status = "active") {
         return await this.request(`/projects/${projectId}/members/${userId}`, "PATCH", {

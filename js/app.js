@@ -153,6 +153,52 @@ document.addEventListener("DOMContentLoaded", () => {
             });
             container.appendChild(div);
         });
+
+        // Добавляем кнопку "Вступить" в левое меню
+        const joinBtnContainer = document.createElement("div");
+        joinBtnContainer.style.marginTop = "20px";
+        joinBtnContainer.style.paddingTop = "15px";
+        joinBtnContainer.style.borderTop = "1px solid var(--border-color)";
+        joinBtnContainer.innerHTML = `<button id="btn-join-project" class="btn btn-outline" style="width: 100%; text-align: center;">➕ Вступить в проект</button>`;
+        container.appendChild(joinBtnContainer);
+
+        const btnJoin = document.getElementById("btn-join-project");
+        if (btnJoin) {
+            btnJoin.onclick = () => {
+                let joinModal = document.getElementById("join-project-modal");
+                if (!joinModal) {
+                    joinModal = document.createElement("div");
+                    joinModal.id = "join-project-modal";
+                    joinModal.className = "modal";
+                    joinModal.innerHTML = `
+                        <div class="modal-content" style="max-width: 400px; min-height: 200px;">
+                            <span class="close-modal" onclick="document.getElementById('join-project-modal').style.display='none'">&times;</span>
+                            <h3 style="margin-bottom: 20px;">Вступление в проект</h3>
+                            <div class="form-group" style="margin-bottom: 20px;">
+                                <label>Код проекта</label>
+                                <input type="text" id="join-project-code" class="input-field" placeholder="Например: EXM-ABCD-1234-WXYZ">
+                            </div>
+                            <button id="btn-submit-join" class="btn" style="width: 100%; background: var(--accent-blue); color: white;">Отправить заявку</button>
+                        </div>
+                    `;
+                    document.body.appendChild(joinModal);
+
+                    document.getElementById("btn-submit-join").onclick = async () => {
+                        const code = document.getElementById("join-project-code").value.trim();
+                        if (!code) return alert("Введите код проекта!");
+                        try {
+                            await api.joinProject(code);
+                            alert("Заявка на вступление отправлена! Ожидайте подтверждения организатора.");
+                            joinModal.style.display = 'none';
+                        } catch (e) {
+                            alert("Ошибка при отправке заявки: " + (e.message || ""));
+                        }
+                    };
+                }
+                document.getElementById("join-project-code").value = "";
+                joinModal.style.display = 'flex';
+            };
+        }
     }
 
     let isCodeVisible = false;
@@ -290,33 +336,17 @@ document.addEventListener("DOMContentLoaded", () => {
         if (!participantsList) return;
         participantsList.innerHTML = "";
 
-        // Извлекаем экспертов из рецензий (т.к. отдельного API для участников нет)
-        const expertsSet = new Set();
-        if (activeProject && activeProject.submissions) {
-            activeProject.submissions.forEach(sub => {
-                if (sub.reviews && Array.isArray(sub.reviews)) {
-                    sub.reviews.forEach(review => {
-                        const reviewerName = review.reviewer?.name || review.reviewer_name;
-                        const reviewerId = review.reviewer?.user_id || review.reviewer_id;
-                        if (reviewerName) {
-                            expertsSet.add(JSON.stringify({
-                                name: reviewerName,
-                                user_id: reviewerId || Math.random()
-                            }));
-                        }
-                    });
-                }
-            });
-        }
-
-        if (expertsSet.size === 0) {
+        const experts = activeProject?.experts || [];
+        if (experts.length === 0) {
             participantsList.innerHTML = `<p style="color: var(--text-muted); font-size: 13px; text-align: center; margin-top: 20px;">Нет участников</p>`;
             return;
         }
 
-        const experts = Array.from(expertsSet).map(exp => JSON.parse(exp));
         experts.forEach(exp => {
             if (!exp) return;
+
+            const roleNames = { "reviewer": "Эксперт", "leader": "Организатор", "Эксперт": "Эксперт", "Соорганизатор": "Организатор" };
+            const roleName = roleNames[exp.role] || exp.role || "Эксперт";
 
             const div = document.createElement("div");
             div.className = "participant-item";
@@ -324,7 +354,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 <div class="avatar">${(exp.name || '??').substring(0, 2).toUpperCase()}</div>
                 <div style="flex: 1;">
                     <div class="p-name">${exp.name || 'Unknown'}</div>
-                    <div class="p-tg" style="font-size: 11px; color: var(--text-muted);">Рецензент</div>
+                    <div class="p-tg" style="font-size: 11px; color: var(--text-muted);">${exp.tg || ''} • ${roleName}</div>
                 </div>
             `;
             participantsList.appendChild(div);
@@ -353,15 +383,15 @@ document.addEventListener("DOMContentLoaded", () => {
         }
 
         const roleOptions = `
-            <option value="Эксперт">🎓 Эксперт</option>
-            <option value="Соорганизатор">🛡️ Соорганизатор</option>
+            <option value="reviewer">🎓 Эксперт</option>
+            <option value="leader">🛡️ Организатор</option>
         `;
 
         activeProject.joinRequests.forEach(req => {
             if (!req) return;
             const div = document.createElement("div");
             div.className = "request-card";
-            const reqId = req.id || Math.random().toString(36).substr(2, 9);
+            const reqId = req.user_id;
             const reqName = String(req.name || "Неизвестный пользователь");
             const reqTg = String(req.tg || "@unknown");
 
@@ -379,22 +409,32 @@ document.addEventListener("DOMContentLoaded", () => {
 
             const acceptBtn = div.querySelector('.btn-accept');
             if (acceptBtn) {
-                acceptBtn.onclick = () => {
+                acceptBtn.onclick = async () => {
                     const selectedRole = document.getElementById(`role-${reqId}`).value;
-                    if (!activeProject.experts) activeProject.experts = [];
-                    activeProject.experts.push({ initials: reqName.substring(0, 2).toUpperCase(), name: reqName, tg: reqTg, role: selectedRole });
-                    activeProject.joinRequests = activeProject.joinRequests.filter(r => r.id !== req.id);
-                    renderRequestsModal();
-                    updateDashboard();
+                    try {
+                        await api.updateMember(activeProject.id, reqId, selectedRole, [], "active");
+                        alert("Заявка принята!");
+                        await loadProjectData(activeProject.id);
+                        renderRequestsModal();
+                        updateDashboard();
+                    } catch (e) {
+                        alert("Ошибка: " + e.message);
+                    }
                 };
             }
 
             const rejectBtn = div.querySelector('.btn-reject');
             if (rejectBtn) {
-                rejectBtn.onclick = () => {
-                    activeProject.joinRequests = activeProject.joinRequests.filter(r => r.id !== req.id);
-                    renderRequestsModal();
-                    updateDashboard();
+                rejectBtn.onclick = async () => {
+                    try {
+                        await api.updateMember(activeProject.id, reqId, "reviewer", [], "deleted");
+                        alert("Заявка отклонена!");
+                        await loadProjectData(activeProject.id);
+                        renderRequestsModal();
+                        updateDashboard();
+                    } catch (e) {
+                        alert("Ошибка: " + e.message);
+                    }
                 };
             }
             list.appendChild(div);
@@ -558,6 +598,18 @@ document.addEventListener("DOMContentLoaded", () => {
             } catch (e) {
                 console.warn("Не удалось подтянуть код проекта:", e);
             }
+
+        try {
+            const membersRes = await api.getProjectMembers(projectId);
+            const allMembers = membersRes.data || [];
+            if (activeProject) {
+                activeProject.experts = allMembers.filter(m => m.status === 'active');
+                activeProject.joinRequests = allMembers.filter(m => m.status === 'pending');
+            }
+        } catch (e) {
+            console.warn("Не удалось подтянуть участников:", e);
+            if (activeProject) { activeProject.experts = []; activeProject.joinRequests = []; }
+        }
 
             const response = await api.getProjectWorks(projectId);
             console.log("📦 Ответ сервера по работам:", response);
@@ -896,6 +948,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 if (reviewPanelEl) reviewPanelEl.style.display = 'none';
 
                 if (typeof updateStatsCounters === 'function') updateStatsCounters();
+            if (typeof updateRequestsBadge === 'function') updateRequestsBadge();
                 if (typeof renderTable === 'function') renderTable();
 
             } else {
@@ -1139,8 +1192,13 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const btnRequestsEl = document.getElementById("btn-requests");
     if (btnRequestsEl) {
-        // Скрываем кнопку заявок, т.к. API их не поддерживает
-        btnRequestsEl.style.display = 'none';
+        btnRequestsEl.style.display = 'inline-flex';
+        btnRequestsEl.onclick = () => {
+            if (requestsModal) {
+                renderRequestsModal();
+                requestsModal.style.display = 'flex';
+            }
+        };
     }
 
     const closeRequestsModal = document.getElementById("close-requests-modal");
@@ -1187,9 +1245,18 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     const btnInvite = document.getElementById("btn-invite");
-    if (btnInvite) {
-        // Скрываем кнопку приглашений, т.к. API управления участниками не полная
-        btnInvite.style.display = 'none';
+    if (btnInvite && inviteModal) {
+        btnInvite.style.display = 'inline-block'; // Возвращаем видимость кнопки
+        btnInvite.onclick = () => {
+            const roleSelect = document.getElementById("invite-role");
+            if (roleSelect) {
+                roleSelect.innerHTML = `
+                    <option value="Эксперт">🎓 Эксперт</option>
+                    <option value="Соорганизатор">🛡️ Соорганизатор</option>
+                `;
+            }
+            inviteModal.style.display = 'flex';
+        };
     }
 
     const closeInviteModal = document.getElementById("close-invite-modal");
@@ -1202,7 +1269,7 @@ document.addEventListener("DOMContentLoaded", () => {
         btnSendInvite.onclick = () => {
             if (!activeProject) return;
             const tgTag = document.getElementById("invite-tg-tag")?.value.trim();
-            const role = document.getElementById("invite-role")?.value;
+            const role = document.getElementById("invite-role")?.value || "Эксперт";
             if (!tgTag || !tgTag.startsWith('@')) return alert("Введите корректный Telegram тег (с @)");
             const mockName = "Новый " + tgTag.substring(1);
             if (!activeProject.experts) activeProject.experts = [];
