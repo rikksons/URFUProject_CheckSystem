@@ -99,17 +99,28 @@ const api = {
             id: proj.id,
             name: proj.project_name || 'Без названия',
             type: (proj.description && proj.description.includes('p2p')) ? 'p2p' : 'exam',
-            code: proj.project_code || '',
+            code: proj.project_code || proj.code || '',
             status: proj.status || 'active',
             description: proj.description || '',
             created_at: proj.created_at
         }));
     },
 
-    createProject: (name, type) => {
+    createProject: (name, type, code) => {
         return api.request("/projects", "POST", {
             project_name: name,
-            description: `Проект типа ${type}`
+            description: `Проект типа ${type}`,
+            project_code: code
+        });
+    },
+
+    async getProjectCode(projectId) {
+        return await this.request(`/projects/${projectId}/code`);
+    },
+
+    async updateProjectCode(projectId, newCode) {
+        return await this.request(`/projects/${projectId}/code`, "PATCH", {
+            project_code: newCode
         });
     },
 

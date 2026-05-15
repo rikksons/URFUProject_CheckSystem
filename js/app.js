@@ -110,7 +110,11 @@ document.addEventListener("DOMContentLoaded", () => {
                     <div class="project-meta">📄 ${proj.submissions?.length || 0} 👥 ${proj.experts?.length || 0}</div>
                 </div>
             `;
-            div.addEventListener('click', () => { activeProject = proj; updateDashboard(); });
+            div.addEventListener('click', async () => {
+                activeProject = proj;
+                await loadProjectData(proj.id);
+                updateDashboard();
+            });
             container.appendChild(div);
         });
     }
@@ -509,6 +513,16 @@ document.addEventListener("DOMContentLoaded", () => {
 
     async function loadProjectData(projectId) {
         try {
+            // Отдельно подтягиваем код напрямую из БД (обходит ограничения серверных моделей)
+            try {
+                const codeRes = await api.getProjectCode(projectId);
+                if (codeRes && codeRes.data && typeof codeRes.data.code !== 'undefined') {
+                    if (activeProject) activeProject.code = codeRes.data.code;
+                }
+            } catch (e) {
+                console.warn("Не удалось подтянуть код проекта:", e);
+            }
+
             const response = await api.getProjectWorks(projectId);
             console.log("📦 Ответ сервера по работам:", response);
 
@@ -807,6 +821,7 @@ document.addEventListener("DOMContentLoaded", () => {
             const expWorkspace = document.getElementById("expert-workspace");
             const btnOpenControl = document.getElementById("btn-open-control");
             const reviewPanelEl = document.getElementById("review-panel");
+            const btnRefreshCode = document.getElementById("refresh-code-btn");
 
             const statsGrid = document.querySelector('.stats-grid');
             const tableContainer = document.querySelector('.table-container');
@@ -839,6 +854,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 // 3. Скрываем инструменты эксперта
                 if (expWorkspace) expWorkspace.style.display = 'none';
                 if (btnOpenControl) btnOpenControl.style.display = 'flex';
+                if (btnRefreshCode) btnRefreshCode.style.display = 'inline-block';
                 if (reviewPanelEl) reviewPanelEl.style.display = 'none';
 
                 if (typeof updateStatsCounters === 'function') updateStatsCounters();
@@ -854,6 +870,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
                 if (expWorkspace) expWorkspace.style.display = 'block';
                 if (btnOpenControl) btnOpenControl.style.display = 'none';
+                if (btnRefreshCode) btnRefreshCode.style.display = 'none';
                 if (reviewPanelEl) reviewPanelEl.style.display = 'none';
 
                 if (typeof renderExpertView === 'function') renderExpertView();
@@ -943,11 +960,12 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const btnToggleCode = document.getElementById("toggle-code-btn");
     const codeDisplay = document.getElementById("project-code-display");
-    if (btnToggleCode && codeDisplay && activeProject) {
+    if (btnToggleCode && codeDisplay) {
         btnToggleCode.onclick = () => {
+            if (!activeProject) return;
             isCodeVisible = !isCodeVisible;
             if (isCodeVisible) {
-                codeDisplay.innerText = activeProject.code || '•••••';
+                codeDisplay.innerText = activeProject.code ? activeProject.code : 'Код не задан';
                 codeDisplay.style.letterSpacing = "normal";
             }
             else {
@@ -958,12 +976,22 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     const btnRefreshCode = document.getElementById("refresh-code-btn");
-    if (btnRefreshCode && activeProject) {
-        btnRefreshCode.onclick = () => {
+    if (btnRefreshCode) {
+        btnRefreshCode.onclick = async () => {
+            if (!activeProject) return;
             if (confirm("Старый код перестанет работать. Продолжить?")) {
-                if (activeProject) {
-                    activeProject.code = generateProjectCode(activeProject.type);
+                const newCode = generateProjectCode(activeProject.type);
+                try {
+                    // Если на бэкенде есть поддержка PATCH /projects/{id}
+                    if (api.updateProjectCode) await api.updateProjectCode(activeProject.id, newCode);
+                    activeProject.code = newCode;
                     if (isCodeVisible && codeDisplay) codeDisplay.innerText = activeProject.code;
+                    alert("Код проекта успешно обновлен!");
+                } catch (e) {
+                    console.warn("Бэкенд не поддерживает обновление кода или произошла ошибка:", e);
+                    activeProject.code = newCode;
+                    if (isCodeVisible && codeDisplay) codeDisplay.innerText = activeProject.code;
+                    alert("Код проекта обновлен локально (для сохранения на сервере может потребоваться доработка бэкенда).");
                 }
             }
         };
@@ -1028,10 +1056,10 @@ document.addEventListener("DOMContentLoaded", () => {
                 try {
                     await api.assignRandomExperts(activeProject.id, 2); // '2' игнорируется, но оставлено для консистентности
                     alert("Эксперты успешно перераспределены сервером!");
- 
+
                     const controlModalEl = document.getElementById("control-panel-modal");
                     if (controlModalEl) controlModalEl.style.display = 'none';
- 
+
                     await loadProjectData(activeProject.id);
                     updateDashboard();
                 } catch (e) {
@@ -1095,7 +1123,8 @@ document.addEventListener("DOMContentLoaded", () => {
             if (!nameInput?.trim()) return alert("Введите название проекта!");
 
             try {
-                await api.createProject(nameInput, typeInput);
+                const newCode = generateProjectCode(typeInput);
+                await api.createProject(nameInput, typeInput, newCode);
 
                 const nameInputField = document.getElementById("new-project-name");
                 if (nameInputField) nameInputField.value = "";
