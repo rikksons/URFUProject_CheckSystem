@@ -188,7 +188,10 @@ const api = {
     },
 
     async assignRandomExperts(projectId, assignments) {
-        return await this.assignExpertsManual(projectId, assignments);
+        // Параметр 'assignments' не используется для автоматического распределения на бэкенде.
+        return await this.request(`/projects/${projectId}/assignments`, "POST", {
+            assignment_type: "auto"
+        });
     },
 
     // ==========================================
@@ -203,6 +206,10 @@ const api = {
 
     async resetWorkReviews(projectId, workId) {
         return await this.request(`/projects/${projectId}/works/${workId}/reset`, "POST");
+    },
+
+    async resetAllProjectReviews(projectId) {
+        return await this.request(`/projects/${projectId}/reset-all`, "POST");
     }
 };
 

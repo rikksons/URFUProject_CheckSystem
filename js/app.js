@@ -1024,15 +1024,40 @@ document.addEventListener("DOMContentLoaded", () => {
     if (btnGlobalRefresh) {
         btnGlobalRefresh.onclick = async () => {
             if (!activeProject) return;
-            if (confirm("Запустить алгоритм распределения на сервере?")) {
+            if (confirm("Запустить автоматическое перераспределение экспертов для всех работ в проекте?")) {
                 try {
-                    await api.assignRandomExperts(activeProject.id, 2);
-                    alert("Эксперты успешно распределены сервером!");
+                    await api.assignRandomExperts(activeProject.id, 2); // '2' игнорируется, но оставлено для консистентности
+                    alert("Эксперты успешно перераспределены сервером!");
+ 
+                    const controlModalEl = document.getElementById("control-panel-modal");
+                    if (controlModalEl) controlModalEl.style.display = 'none';
+ 
                     await loadProjectData(activeProject.id);
-                    renderTable();
+                    updateDashboard();
                 } catch (e) {
-                    console.error(e);
-                    alert("Ошибка распределения на сервере.");
+                    console.error("Ошибка перераспределения на сервере:", e);
+                    alert(`Ошибка перераспределения на сервере: ${e.message || 'Проверьте консоль для деталей.'}`);
+                }
+            }
+        };
+    }
+
+    // Логика для кнопки "Сбросить все проверки"
+    const btnResetAll = document.getElementById("btn-global-reset");
+    if (btnResetAll) {
+        btnResetAll.onclick = async () => {
+            if (!activeProject) return;
+            if (confirm(`Вы уверены, что хотите сбросить ВСЕ проверки в проекте "${activeProject.name}"? Это действие удалит все оценки и переназначит задания экспертам.`)) {
+                try {
+                    await api.resetAllProjectReviews(activeProject.id);
+                    alert('Все проверки в проекте были успешно сброшены.');
+                    const controlModalEl = document.getElementById("control-panel-modal");
+                    if (controlModalEl) controlModalEl.style.display = 'none';
+                    await loadProjectData(activeProject.id);
+                    updateDashboard();
+                } catch (e) {
+                    console.error("Ошибка при сбросе всех проверок:", e);
+                    alert(`Не удалось сбросить проверки: ${e.message || 'Проверьте консоль для деталей.'}`);
                 }
             }
         };
@@ -1331,4 +1356,4 @@ document.addEventListener("DOMContentLoaded", () => {
     // ==========================================
     setInterval(updateStatsCounters, 30000);
     initApp();
-});
+}); initApp();
