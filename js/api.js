@@ -94,15 +94,15 @@ const api = {
             console.warn("Не удалось найти массив проектов", payload);
             return [];
         }
-
         return rawProjects.map(proj => ({
             id: proj.id,
             name: proj.project_name || 'Без названия',
-            type: (proj.description && proj.description.includes('p2p')) ? 'p2p' : 'exam',
+            type: (proj.description?.includes('p2p')) ? 'p2p' : 'exam',
             code: proj.project_code || proj.code || '',
+
             status: proj.status || 'active',
             description: proj.description || '',
-            created_at: proj.created_at
+            created_at: proj.created_at,
         }));
     },
 
