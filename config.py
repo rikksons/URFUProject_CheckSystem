@@ -1,21 +1,24 @@
-from pydantic_settings import BaseSettings
-from functools import lru_cache
+# config.py
+from pathlib import Path
+import os
+from dotenv import load_dotenv
 
-class Settings(BaseSettings):
-    BOT_TOKEN: str
-    ADMIN_ID: int
-    
-    SPREADSHEET_ID: str
-    SHEET_ID: int
-    CREDENTIALS_PATH: str = "credentials.json"
-    
-    PHOTOS_DIR: str = "photos"
-    
-    class Config:
-        env_file = ".env"
+load_dotenv()
 
-@lru_cache()
-def get_settings():
-    return Settings()
+BASE_DIR = Path(__file__).resolve().parent
 
-settings = get_settings()
+SPREADSHEET_ID = os.getenv("SPREADSHEET_ID")
+SERVICE_ACCOUNT_FILE = os.getenv("SERVICE_ACCOUNT_FILE", str(BASE_DIR / "service_account.json"))
+
+# JWT настройки
+JWT_SECRET = os.getenv("JWT_SECRET", "dev-secret-change-me-in-prod")
+JWT_ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
+JWT_EXPIRE_HOURS = int(os.getenv("JWT_EXPIRE_HOURS", "24"))
+
+# Режим авторизации: "jwt" или "x-user-id" (для отладки)
+AUTH_MODE = os.getenv("AUTH_MODE", "jwt")
+
+SHEET_NAMES = ["Users", "Projects", "Members", "Iterations", "Works", "Reviews", "Assignments", "IterationLogs"]
+
+if not Path(SERVICE_ACCOUNT_FILE).exists():
+    raise RuntimeError(f"🔑 Файл '{SERVICE_ACCOUNT_FILE}' не найден")
