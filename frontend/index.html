@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="ru">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Система проверки работ</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+
+<body>
+    <div class="app-container">
+        <aside class="sidebar-left">
+            <div class="logo">
+                <div class="search-bar">
+                    <input type="text" placeholder="Поиск проектов...">
+                </div>
+            </div>
+            <div class="projects-list">
+                <div class="section-title">ПРОЕКТ <button class="add-btn">+</button></div>
+
+                <div class="project-item active">
+                    <div class="project-icon blue">В</div>
+                    <div class="project-info">
+                        <div class="project-name">Веб-разработка <span class="badge orange">3</span></div>
+                        <div class="project-meta">📄 3 👥 2 <span>Expert</span></div>
+                    </div>
+                </div>
+
+                <div class="project-item">
+                    <div class="project-icon green">М</div>
+                    <div class="project-info">
+                        <div class="project-name">Машинное обуче... <span class="badge yellow">12</span></div>
+                        <div class="project-meta">📄 12 👥 1 <span>Peer</span></div>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <main class="main-content">
+            <header class="top-header">
+                <div class="header-title">
+                    <div class="project-icon large blue" id="header-icon">В</div>
+                    <div>
+                        <h1 id="header-title">Загрузка...</h1>
+                        <span class="subtitle">
+                            👤 Тип: <span id="header-type">...</span> • Создано: <span id="header-date">...</span>
+                            <span class="code-container">
+                                | Код: <span id="project-code-display"
+                                    class="hidden-code">•••••••••••••••••••••••</span>
+                                <span id="toggle-code-btn" class="icon-btn" title="Показать/Скрыть код">👁️</span>
+                                <span id="refresh-code-btn" class="icon-btn" title="Обновить (сбросить) код">🔄</span>
+                            </span>
+                        </span>
+                    </div>
+                </div>
+                <div class="header-actions">
+                    <div class="role-selector"
+                        style="margin-left: 15px; padding-left: 15px; border-left: 1px solid var(--border-color);">
+                        Просмотр от лица:
+                        <select id="global-role-selector" class="input-field" style="width: 140px; padding: 5px;">
+                            <option value="organizer">🛡️ Организатор</option>
+                            <option value="expert">🎓 Эксперт</option>
+                        </select>
+                    </div>
+                    <button class="btn btn-outline" id="btn-requests"
+                        style="position: relative; border-color: var(--status-orange); color: var(--status-orange);">
+                        🔔 Заявки <span id="requests-badge" class="badge orange"
+                            style="position: absolute; top: -8px; right: -8px; display: none;">0</span>
+                    </button>
+                    <button class="btn btn-outline" id="btn-open-control"
+                        style="border-color: var(--accent-blue); color: var(--accent-blue);">⚙️ Управление</button>
+                </div>
+            </header>
+            <div id="expert-workspace" style="display: none; padding: 20px;">
+            </div>
+            <div id="organizer-workspace">
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-icon gray">📄</div>
+                        <div>
+                            <div class="stat-value" id="stat-total">3</div>
+                            <div class="stat-label">Всего работ</div>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon green">✔️</div>
+                        <div>
+                            <div class="stat-value" id="stat-reviewed">1</div>
+                            <div class="stat-label">Проверено</div>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon blue">🕒</div>
+                        <div>
+                            <div class="stat-value" id="stat-checking">1</div>
+                            <div class="stat-label">На проверке</div>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon orange">⏳</div>
+                        <div>
+                            <div class="stat-value" id="stat-waiting">1</div>
+                            <div class="stat-label">Ожидание</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="table-container">
+                    <div class="table-header">
+                        <h2>Загруженные работы</h2>
+                        <div class="table-actions"
+                            style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                            <div style="display: flex; gap: 15px; align-items: center;">
+                                <input type="text" placeholder="Поиск по имени или TG..." class="input-field"
+                                    style="width: 250px;">
+                                <button id="btn-toggle-selection" class="btn btn-outline"
+                                    style="border-color: var(--border-color);">☑️ Выбрать работы</button>
+                                <button id="btn-add-exam-work" class="btn"
+                                    style="background: var(--accent-blue); color: white; display: none;">📤 Загрузить
+                                    работу</button>
+                            </div>
+
+                            <div id="batch-actions-toolbar" style="display: none; gap: 10px;">
+                                <button id="btn-select-all" class="btn btn-outline"
+                                    style="border-color: var(--text-muted); color: var(--text-main);">☑️ Выбрать
+                                    все</button>
+
+                                <button id="btn-batch-delete" class="btn btn-outline"
+                                    style="color: #ef4444; border-color: #ef4444;">🗑️ Удалить</button>
+                                <button id="btn-batch-reassign" class="btn btn-outline"
+                                    style="border-color: var(--accent-blue); color: var(--accent-blue);">🔄
+                                    Переназначить</button>
+                                <button id="btn-batch-send" class="btn"
+                                    style="background: var(--status-green); color: white;">✔️ Отправить без
+                                    проверки</button>
+                            </div>
+                        </div>
+                    </div>
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Имя студента</th>
+                                <th>Telegram</th>
+                                <th>Дата загрузки</th>
+                                <th>Статус</th>
+                                <th>Оценка</th>
+                                <th>Рецензент</th>
+                                <th>Действия</th>
+                            </tr>
+                        </thead>
+                        <tbody id="table-body">
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="review-panel" id="review-panel" style="display: none; position: relative;">
+                    <span class="close-panel" id="close-review-panel">&times;</span>
+
+                    <h3 style="color: white; margin-bottom: 15px;">Отзывы о работе</h3>
+                    <div id="review-content">
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <aside class="sidebar-right">
+            <div class="participants-header">
+                <h3>Участники</h3>
+                <button class="btn btn-outline small" id="btn-invite">👥 Пригласить</button>
+            </div>
+            <div class="participants-list" id="participants-list">
+            </div>
+        </aside>
+    </div>
+    <script src="js/api.js"></script>
+    <script src="js/app.js"></script>
+    <div id="work-modal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <span class="close-modal" id="close-modal">&times;</span>
+            <h3 id="modal-student-name" style="margin-bottom: 10px;">Работа ученика</h3>
+            <div class="work-placeholder">
+                <p>Здесь будет отображаться загруженная работа (картинка, PDF, архив или код).</p>
+            </div>
+        </div>
+    </div>
+
+    <div id="context-menu" class="context-menu" style="display: none;">
+        <div class="context-item" id="reset-single-action">🔄 Сбросить проверку</div>
+        <div class="context-item text-danger" id="delete-action">🗑️ Удалить работу</div>
+    </div>
+    <div id="create-project-modal" class="modal" style="display: none;">
+        <div class="modal-content" style="max-width: 400px; min-height: auto;">
+            <span class="close-modal" id="close-create-modal">&times;</span>
+            <h3 style="margin-bottom: 20px;">Создать новый проект</h3>
+
+            <div class="form-group">
+                <label>Название проекта</label>
+                <input type="text" id="new-project-name" placeholder="Например: Проектирование БД" class="input-field">
+            </div>
+
+            <div class="form-group" style="margin-top: 15px;">
+                <label>Режим проверки</label>
+                <select id="new-project-type" class="input-field">
+                    <option value="p2p">Peer-to-Peer (Ученики проверяют друг друга)</option>
+                    <option value="exam">Экзаменационный (Проверяют только эксперты)</option>
+                </select>
+            </div>
+
+            <button id="btn-save-project" class="btn"
+                style="width: 100%; margin-top: 25px; background: var(--accent-blue); color: white;">Создать</button>
+        </div>
+    </div>
+
+    <div id="requests-modal" class="modal" style="display: none;">
+        <div class="modal-content" style="max-width: 600px; min-height: auto;">
+            <span class="close-modal" id="close-requests-modal">&times;</span>
+            <h3 style="margin-bottom: 20px;">Заявки на вступление в проект</h3>
+            <div id="requests-list" style="max-height: 400px; overflow-y: auto;">
+            </div>
+        </div>
+    </div>
+    <div id="participant-context-menu" class="context-menu" style="display: none;">
+        <div class="context-header"
+            style="font-size: 11px; color: var(--text-muted); padding: 8px 15px; border-bottom: 1px solid var(--border-color);">
+            Изменить роль</div>
+        <div class="context-item role-option" data-role="Соорганизатор">🛡️ Соорганизатор</div>
+        <div class="context-item role-option" data-role="Эксперт">🎓 Эксперт</div>
+        <div class="context-item text-danger" id="remove-participant"
+            style="border-top: 1px solid var(--border-color); margin-top: 5px;">🚪 Исключить</div>
+    </div>
+    <div id="invite-modal" class="modal" style="display: none;">
+        <div class="modal-content" style="max-width: 400px; min-height: auto;">
+            <span class="close-modal" id="close-invite-modal">&times;</span>
+            <h3 style="margin-bottom: 20px;">Пригласить участника</h3>
+
+            <div class="form-group">
+                <label>Telegram тег (начинается с @)</label>
+                <input type="text" id="invite-tg-tag" placeholder="@username" class="input-field">
+            </div>
+
+            <div class="form-group" style="margin-top: 15px;">
+                <label>Роль</label>
+                <select id="invite-role" class="input-field">
+                </select>
+            </div>
+
+            <button id="btn-send-invite" class="btn"
+                style="width: 100%; margin-top: 25px; background: var(--accent-blue); color: white;">Отправить
+                приглашение</button>
+        </div>
+    </div>
+    <div id="control-panel-modal" class="modal" style="display: none;">
+        <div class="modal-content" style="max-width: 450px;">
+            <span class="close-modal" id="close-control-modal">&times;</span>
+            <h3 style="margin-bottom: 20px;">Управление проектом</h3>
+
+            <div class="control-section">
+                <label style="display: block; margin-bottom: 8px;">Количество проверок на работу:</label>
+                <input type="number" id="panel-req-reviews" min="1" max="5" class="input-field">
+            </div>
+
+            <div class="control-section" style="margin-top: 25px;">
+                <label style="display: block; margin-bottom: 8px;">Состояние системы:</label>
+                <div style="display: flex; gap: 10px;">
+                    <button id="btn-start-grading" class="btn"
+                        style="background: var(--status-green); color: white; flex: 1; display: flex; align-items: center; justify-content: center; gap: 5px;">▶️
+                        Начать</button>
+                    <button id="btn-stop-grading" class="btn"
+                        style="background: var(--status-orange); color: white; flex: 1; display: flex; align-items: center; justify-content: center; gap: 5px;">⏸️
+                        Остановить</button>
+                </div>
+                <p style="font-size: 11px; color: var(--text-muted); margin-top: 10px;">
+                    При остановке эксперты не смогут брать новые работы, но доделают текущие.
+                </p>
+            </div>
+
+            <div class="control-section"
+                style="margin-top: 25px; border-top: 1px solid var(--border-color); padding-top: 20px;">
+                <button id="btn-global-refresh" class="btn btn-outline" style="width: 100%; margin-bottom: 10px;">🔄
+                    Переназначить всех экспертов</button>
+                <button id="btn-global-reset" class="btn"
+                    style="width: 100%; background: #ef4444; color: white; margin-bottom: 25px;">🗑️ Сбросить все
+                    проверки</button>
+
+                <div style="border-top: 1px solid var(--border-color); padding-top: 15px;">
+                    <button id="btn-delete-project" class="btn"
+                        style="width: 100%; background: transparent; border: 1px solid #ef4444; color: #ef4444;">⚠️
+                        Удалить проект навсегда</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    </div>
+    <!-- Модалка загрузки работы (Экзамен) -->
+    <div id="upload-exam-modal" class="modal" style="display: none;">
+        <div class="modal-content" style="max-width: 400px; min-height: auto;">
+            <span class="close-modal" id="close-upload-exam">&times;</span>
+            <h3 style="margin-bottom: 20px;">Загрузить работу (Экзамен)</h3>
+
+            <div class="form-group">
+                <label>Ссылка на файл (PDF, архив и т.д.)</label>
+                <input type="text" id="exam-file-url" placeholder="https://storage.link/file.pdf" class="input-field">
+            </div>
+
+            <button id="btn-submit-exam-work" class="btn"
+                style="width: 100%; margin-top: 25px; background: var(--accent-blue); color: white;">Добавить в
+                базу</button>
+        </div>
+    </div>
+    <!-- Модалка загрузки МОЕЙ работы (P2P / Эксперт) -->
+    <div id="upload-my-work-modal" class="modal" style="display: none;">
+        <div class="modal-content" style="max-width: 400px; min-height: auto;">
+            <span class="close-modal" id="close-upload-my-work">&times;</span>
+            <h3 style="margin-bottom: 20px;">Загрузить мою работу</h3>
+
+            <div class="form-group">
+                <label>Название работы</label>
+                <input type="text" id="my-work-title" placeholder="Например: Практика №1" class="input-field" value="">
+            </div>
+
+            <div class="form-group" style="margin-top: 15px;">
+                <label>Ссылка на файл (GitHub, Google Drive и т.д.)</label>
+                <input type="text" id="my-work-url" placeholder="https://..." class="input-field">
+            </div>
+
+            <button id="btn-submit-my-work" class="btn"
+                style="width: 100%; margin-top: 25px; background: var(--accent-blue); color: white;">Отправить на
+                проверку</button>
+        </div>
+    </div>
+</body>
+
+</html>
