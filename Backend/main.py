@@ -14,6 +14,7 @@ from routers import (
 )  # ← добавили auth
 import uvicorn
 
+
 app = FastAPI(title="Project Review API", version="1.2.0")
 
 os.makedirs("uploads", exist_ok=True)
