@@ -38,6 +38,40 @@ document.addEventListener("DOMContentLoaded", () => {
         };
     }
 
+    // === ДОБАВЛЕННЫЙ БЛОК: Логотип проекта в правый верхний угол ===
+    const topHeader = document.querySelector('.top-header');
+    const roleSelectorEl = document.getElementById("global-role-selector");
+
+    if (topHeader) {
+        const logoImg = document.createElement('img');
+        logoImg.src = 'logoTrans.png';
+        logoImg.alt = 'Project Logo';
+        logoImg.style.height = '80px';
+        logoImg.style.objectFit = 'contain';
+        logoImg.style.userSelect = 'none';
+
+        if (roleSelectorEl) {
+            const parent = roleSelectorEl.parentElement;
+            if (parent && parent.classList.contains('top-header')) {
+                const rightWrapper = document.createElement('div');
+                rightWrapper.style.display = 'flex';
+                rightWrapper.style.alignItems = 'center';
+                rightWrapper.style.gap = '20px';
+                parent.insertBefore(rightWrapper, roleSelectorEl);
+                rightWrapper.appendChild(roleSelectorEl);
+                rightWrapper.appendChild(logoImg); // Логотип встает правее
+            } else if (parent) {
+
+                parent.style.display = 'flex';
+                parent.style.alignItems = 'center';
+                parent.style.gap = '20px';
+                parent.appendChild(logoImg);
+            }
+        } else {
+            topHeader.appendChild(logoImg);
+        }
+    }
+
     // Проверяет, назначена ли работа текущему пользователю
     function isAssignedToCurrentUser(sub) {
         if (!sub || !sub.assignedExperts) return false;
@@ -45,10 +79,34 @@ document.addEventListener("DOMContentLoaded", () => {
         const userIdentifiers = [String(currentUser?.name || ''), String(currentUser?.id || ''), String(currentUser?.tg || ''), String(currentUser?.telegramtag || '')].filter(Boolean);
         return candidates.some(c => userIdentifiers.includes(c));
     }
-    let activeIterationId = "it_1";
+    let activeIterationId = 1;
     let currentRole = 'organizer';
     let isSelectionMode = false;
     let selectedSubmissionIds = [];
+
+    function getSavedIterationId() {
+        if (!activeProject) return 1;
+        const idFromProject = activeProject.iterationId || activeProject.iteration_id || activeProject.iterationButtonId;
+        if (idFromProject) {
+            const numeric = Number(idFromProject);
+            if (Number.isInteger(numeric) && numeric >= 1 && numeric <= 4) return numeric;
+        }
+
+        const statusValue = String(activeProject.iterationStatus || activeProject.iteration_status || activeProject.status || '').toLowerCase();
+        if (statusValue) {
+            const found = Object.entries(iterationButtonConfig).find(([, cfg]) => cfg.status === statusValue);
+            if (found) return Number(found[0]);
+        }
+
+        return 1;
+    }
+
+    function saveIterationState(iterationId, status) {
+        activeIterationId = iterationId;
+        if (!activeProject) return;
+        activeProject.iterationId = iterationId;
+        activeProject.iterationStatus = status;
+    }
 
     // Элементы интерфейса
     const workModal = document.getElementById("work-modal");
@@ -57,6 +115,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const participantMenu = document.getElementById("participant-context-menu");
     const controlModal = document.getElementById("control-panel-modal");
     const requestsModal = document.getElementById("requests-modal");
+    const iterationButtonsContainer = document.getElementById("iteration-buttons");
     const createProjectModal = document.getElementById("create-project-modal");
     const inviteModal = document.getElementById("invite-modal");
 
@@ -206,9 +265,11 @@ document.addEventListener("DOMContentLoaded", () => {
     function renderHeader() {
         if (!activeProject) return;
 
+        const iterIdForHeader = (typeof getSavedIterationId === 'function') ? getSavedIterationId() : (activeProject.iterationId || activeProject.iteration_id || 1);
+        const iterLabel = (iterationButtonConfig && iterationButtonConfig[iterIdForHeader]) ? iterationButtonConfig[iterIdForHeader].label : (activeProject.iterationTitle || '—');
         const statusDot = activeProject.isSystemRunning
             ? '<span class="status-indicator active"></span>Запущено'
-            : '<span class="status-indicator paused"></span>На паузе';
+            : `<span class="status-indicator paused"></span>${iterLabel}`;
 
         const titleEl = document.getElementById("header-title");
         if (titleEl) {
@@ -468,8 +529,33 @@ document.addEventListener("DOMContentLoaded", () => {
 
     function openWorkModal(submission) {
         const nameEl = document.getElementById("modal-student-name");
-        if (nameEl && workModal && submission) {
+        const placeholder = document.querySelector("#work-modal .work-placeholder");
+        if (nameEl && workModal && submission && placeholder) {
             nameEl.innerText = `Работа: ${submission.name || 'Без названия'} (${submission.telegram || '—'})`;
+
+            let url = submission.contentUrl;
+            if (url) {
+                if (url.startsWith('/')) {
+                    url = `http://localhost:8000${url}`;
+                }
+                const extension = url.split('?')[0].split('.').pop().toLowerCase();
+                const imageExtensions = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp'];
+                if (imageExtensions.includes(extension)) {
+                    placeholder.innerHTML = `<img src="${url}" style="max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 8px;">`;
+                    placeholder.style.border = 'none';
+                } else {
+                    placeholder.innerHTML = `
+                        <div style="text-align: center;">
+                            <div style="font-size: 48px; margin-bottom: 15px;">📁</div>
+                            <a href="${url}" target="_blank" class="btn" style="background: var(--accent-blue); color: white; text-decoration: none; display: inline-block;">Скачать / Открыть файл</a>
+                        </div>
+                    `;
+                    placeholder.style.border = '2px dashed var(--border-color)';
+                }
+            } else {
+                placeholder.innerHTML = `<p>Файл не прикреплен.</p>`;
+                placeholder.style.border = '2px dashed var(--border-color)';
+            }
             workModal.style.display = 'flex';
         }
     }
@@ -599,17 +685,17 @@ document.addEventListener("DOMContentLoaded", () => {
                 console.warn("Не удалось подтянуть код проекта:", e);
             }
 
-        try {
-            const membersRes = await api.getProjectMembers(projectId);
-            const allMembers = membersRes.data || [];
-            if (activeProject) {
-                activeProject.experts = allMembers.filter(m => m.status === 'active');
-                activeProject.joinRequests = allMembers.filter(m => m.status === 'pending');
+            try {
+                const membersRes = await api.getProjectMembers(projectId);
+                const allMembers = membersRes.data || [];
+                if (activeProject) {
+                    activeProject.experts = allMembers.filter(m => m.status === 'active');
+                    activeProject.joinRequests = allMembers.filter(m => m.status === 'pending');
+                }
+            } catch (e) {
+                console.warn("Не удалось подтянуть участников:", e);
+                if (activeProject) { activeProject.experts = []; activeProject.joinRequests = []; }
             }
-        } catch (e) {
-            console.warn("Не удалось подтянуть участников:", e);
-            if (activeProject) { activeProject.experts = []; activeProject.joinRequests = []; }
-        }
 
             const response = await api.getProjectWorks(projectId);
             console.log("📦 Ответ сервера по работам:", response);
@@ -649,116 +735,124 @@ document.addEventListener("DOMContentLoaded", () => {
         if (!workspace || !activeProject || !currentUser) return;
 
         workspace.innerHTML = "";
+        const stageConfig = iterationButtonConfig[getSavedIterationId()] || iterationButtonConfig[1];
+        const currentStage = stageConfig.status;
+        const isExpert = currentRole !== 'organizer';
+        const myWork = activeProject.type === 'p2p'
+            ? activeProject.submissions?.find(s => s.author_id === currentUser.id)
+            : null;
 
-        if (activeProject.type === 'p2p') {
-            // Ищем загруженную работу текущего пользователя по автору
-            const myWork = activeProject.submissions?.find(s => s.author_id === currentUser.id);
-
-            // ----------------------------------------------------
-            // СЦЕНАРИЙ 1: РАБОТА ЕЩЕ НЕ ЗАГРУЖЕНА
-            // ----------------------------------------------------
+        const renderP2PCollection = () => {
             if (!myWork) {
-                workspace.innerHTML = `
+                return `
                     <h3 style="margin-bottom: 20px;">Моя работа (Peer-to-Peer)</h3>
-                    
                     <div style="background: rgba(0,0,0,0.2); padding: 20px; border-radius: 8px; border: 1px dashed var(--border-color); margin-bottom: 20px;">
-                        <p style="color: var(--text-muted); margin-bottom: 15px;">Чтобы начать проверять других участников, вам необходимо сначала загрузить свою собственную работу.</p>
-                        <button id="btn-upload-my-work" class="btn" style="background: var(--accent-blue); color: white;">
-                            📥 Загрузить мою работу
-                        </button>
+                        <p style="color: var(--text-muted); margin-bottom: 15px;">Чтобы участвовать в проверке, загрузите свою работу.</p>
+                        <button id="btn-upload-my-work" class="btn" style="background: var(--accent-blue); color: white;">📥 Загрузить мою работу</button>
                     </div>
                 `;
-
-                // Привязываем логику к кнопке
-                const btnUploadMyWork = document.getElementById("btn-upload-my-work");
-                const uploadMyWorkModal = document.getElementById("upload-my-work-modal");
-
-                if (btnUploadMyWork && uploadMyWorkModal) {
-                    btnUploadMyWork.onclick = () => {
-                        document.getElementById("my-work-url").value = "";
-                        uploadMyWorkModal.style.display = "flex";
-                    };
-                }
-
-                const closeUploadMyWork = document.getElementById("close-upload-my-work");
-                if (closeUploadMyWork) closeUploadMyWork.onclick = () => uploadMyWorkModal.style.display = "none";
-
-                const btnSubmitMyWork = document.getElementById("btn-submit-my-work");
-                if (btnSubmitMyWork) {
-                    btnSubmitMyWork.onclick = async () => {
-                        const title = document.getElementById("my-work-title").value.trim() || "P2P Работа";
-                        const fileUrl = document.getElementById("my-work-url").value.trim();
-
-                        if (!fileUrl) return alert("Пожалуйста, введите ссылку на работу!");
-
-                        try {
-                            await api.submitWork(activeProject.id, { title: title, content: fileUrl });
-                            alert("✅ Ваша работа успешно отправлена!");
-                            uploadMyWorkModal.style.display = "none";
-
-                            if (typeof loadProjectData === 'function') await loadProjectData(activeProject.id);
-                            updateDashboard();
-                        } catch (error) {
-                            console.error("Ошибка загрузки работы:", error);
-                            alert("❌ Ошибка при отправке работы. Проверьте консоль.");
-                        }
-                    };
-                }
             }
-            // ----------------------------------------------------
-            // СЦЕНАРИЙ 2: РАБОТА ЗАГРУЖЕНА, ВЫБИРАЕМ ЧУЖУЮ ДЛЯ ПРОВЕРКИ
-            // ----------------------------------------------------
-            else {
-                // Получаем все работы кроме своей
-                const otherWorks = activeProject.submissions?.filter(sub =>
-                    sub.id !== myWork.id && sub.author_id !== currentUser.id &&
-                    !sub.reviews?.some(r => r.reviewer?.user_id === currentUser?.id || r.reviewer_id === currentUser?.id || r.reviewerTg === currentUser?.tg)
-                ) || [];
+            return `
+                <h3 style="margin-bottom: 20px;">Моя работа (Peer-to-Peer)</h3>
+                <div style="background: rgba(16, 185, 129, 0.1); padding: 20px; border-radius: 8px; border: 1px dashed var(--status-green); margin-bottom: 20px;">
+                    <h4 style="color: var(--status-green); margin-bottom: 10px;">✅ Ваша работа загружена</h4>
+                    <p style="color: var(--text-muted); margin: 0;">Сбор работ продолжается. Проверки пока недоступны.</p>
+                </div>
+            `;
+        };
 
-                if (otherWorks.length === 0) {
-                    // Нет других работ для проверки
-                    workspace.innerHTML = `
-                        <h3 style="margin-bottom: 20px;">Моя работа (Peer-to-Peer) <span style="font-size: 14px; color: var(--status-green); margin-left: 10px;">✅ Загружена</span></h3>
-                        <div style="background: rgba(16, 185, 129, 0.1); padding: 20px; border-radius: 8px; border: 1px dashed var(--status-green); margin-bottom: 20px; text-align: center;">
-                            <h4 style="color: var(--status-green); margin-bottom: 10px;">✅ Ваша работа успешно загружена!</h4>
-                            <p style="color: var(--text-muted);">В проекте пока нет других работ для проверки. Ожидайте, пока другие участники загрузят свои работы.</p>
-                        </div>
-                    `;
-                } else {
-                    // Выбираем одну случайную работу для проверки
-                    const randomWork = otherWorks[Math.floor(Math.random() * otherWorks.length)];
-
-                    workspace.innerHTML = `
-                        <h3 style="margin-bottom: 20px;">Моя работа (Peer-to-Peer) <span style="font-size: 14px; color: var(--status-green); margin-left: 10px;">✅ Загружена</span></h3>
-                        <h3 style="margin-bottom: 20px; margin-top: 30px; border-top: 1px solid var(--border-color); padding-top: 20px;">Работа для проверки:</h3>
-                        <div id="p2p-review-card" style="background: rgba(0,0,0,0.2); padding: 20px; border-radius: 8px; border: 1px solid var(--border-color); margin-bottom: 20px;">
-                            <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 15px;">
-                                <div>
-                                    <h4 style="color: white; margin: 0 0 5px 0;">${randomWork.name || 'Без названия'}</h4>
-                                    <p style="color: var(--text-muted); font-size: 13px; margin: 0;">
-                                        Автор: <strong>${randomWork.telegram || 'Unknown'}</strong> • Загружена: ${randomWork.date}
-                                    </p>
-                                </div>
-                                <div style="text-align: right;">
-                                    <p style="color: var(--status-orange); font-weight: bold; margin: 0;">⭐ Ожидает проверки</p>
-                                </div>
-                            </div>
-                            <div style="display: flex; gap: 10px;">
-                                <button class="btn btn-outline" onclick="openWorkModalById(${randomWork.id})" style="border-color: var(--accent-blue); color: var(--accent-blue);">👁️ Просмотреть</button>
-                                <button class="btn" onclick="openExpertEvaluateModal(${randomWork.id})" style="background: var(--status-green); color: white; flex: 1;">💬 Оценить работу</button>
-                            </div>
-                        </div>
-                    `;
-                }
+        const renderP2PReviewing = () => {
+            if (!myWork) {
+                return `
+                    <h3 style="margin-bottom: 20px;">Проверка работ</h3>
+                    <div style="background: rgba(0,0,0,0.2); padding: 20px; border-radius: 8px; border: 1px dashed var(--border-color); margin-bottom: 20px;">
+                        <p style="color: var(--text-muted); margin-bottom: 15px;">Чтобы участвовать в проверке, загрузите свою работу.</p>
+                        <button id="btn-upload-my-work" class="btn" style="background: var(--accent-blue); color: white;">📥 Загрузить мою работу</button>
+                    </div>
+                `;
             }
-        } else {
-            // КОД ДЛЯ ЭКЗАМЕНА (остается без изменений)
-            let myAssignedWorks = activeProject.submissions?.filter(sub =>
-                isAssignedToCurrentUser(sub) &&
+            const otherWorks = activeProject.submissions?.filter(sub =>
+                sub.id !== myWork.id && sub.author_id !== currentUser.id &&
                 !sub.reviews?.some(r => r.reviewer?.user_id === currentUser?.id || r.reviewer_id === currentUser?.id || r.reviewerTg === currentUser?.tg)
             ) || [];
+            if (otherWorks.length === 0) {
+                return `
+                    <h3 style="margin-bottom: 20px;">Проверка работ</h3>
+                    <div style="background: rgba(16, 185, 129, 0.1); padding: 20px; border-radius: 8px; border: 1px dashed var(--status-green); text-align: center;">
+                        <h4 style="color: var(--status-green); margin-bottom: 10px;">⏳ Нечего проверять</h4>
+                        <p style="color: var(--text-muted); margin: 0;">Ожидайте новых работ от участников.</p>
+                    </div>
+                `;
+            }
+            const randomWork = otherWorks[Math.floor(Math.random() * otherWorks.length)];
+            return `
+                <h3 style="margin-bottom: 20px;">Проверка работ</h3>
+                <div id="p2p-review-card" style="background: rgba(0,0,0,0.2); padding: 20px; border-radius: 8px; border: 1px solid var(--border-color); margin-bottom: 20px;">
+                    <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 15px;">
+                        <div>
+                            <h4 style="color: white; margin: 0 0 5px 0;">${randomWork.name || 'Без названия'}</h4>
+                            <p style="color: var(--text-muted); font-size: 13px; margin: 0;">Автор: <strong>${randomWork.telegram || 'Unknown'}</strong> • Загружена: ${randomWork.date}</p>
+                        </div>
+                        <div style="text-align: right;">
+                            <p style="color: var(--status-orange); font-weight: bold; margin: 0;">⭐ Ожидает проверки</p>
+                        </div>
+                    </div>
+                    <div style="display: flex; gap: 10px;">
+                        <button class="btn btn-outline" onclick="openWorkModalById(${randomWork.id})" style="border-color: var(--accent-blue); color: var(--accent-blue);">👁️ Просмотреть</button>
+                        <button class="btn" onclick="openExpertEvaluateModal(${randomWork.id})" style="background: var(--status-green); color: white; flex: 1;">💬 Оценить работу</button>
+                    </div>
+                </div>
+            `;
+        };
 
-            // Если у эксперта нет назначенных работ — попробуем локально назначить одну незанятую работу
+        const renderP2PPublished = () => {
+            const myReviewItems = activeProject.submissions?.flatMap(sub =>
+                (sub.reviews || []).filter(r =>
+                    r?.reviewer?.user_id === currentUser?.id || r?.reviewer_id === currentUser?.id || String(r?.reviewerTg || '').toLowerCase() === String(currentUser?.tg || '').toLowerCase()
+                ).map(review => ({ ...review, workTitle: sub.name, workDate: sub.date, workAuthor: sub.telegram }))
+            ) || [];
+            const reviewsHtml = myReviewItems.length > 0
+                ? myReviewItems.map(review => `
+                    <div class="review-card" style="margin-bottom: 12px; border: 1px solid var(--border-color); padding: 12px; border-radius: 8px; background: rgba(255,255,255,0.04);">
+                        <div style="display: flex; justify-content: space-between; gap: 10px; align-items: center; margin-bottom: 8px;">
+                            <div>
+                                <div style="font-weight: 600; color: white;">${review.workTitle || 'Работа'}</div>
+                                <div style="font-size: 12px; color: var(--text-muted);">Автор: ${review.workAuthor || '—'} • ${review.workDate || '—'}</div>
+                            </div>
+                            <div style="color: var(--status-orange); font-weight: bold;">Оценка: ⭐ ${(review.rating ?? review.score ?? 0).toFixed(1)}</div>
+                        </div>
+                        <div style="color: var(--text-main); font-size: 14px;">${review.review || review.comment || 'Без комментария'}</div>
+                    </div>
+                `).join('')
+                : `<p style="color: var(--text-muted);">Пока нет доступных комментариев.</p>`;
+            return `
+                <h3 style="margin-bottom: 20px;">Публикация результатов</h3>
+                <div style="background: rgba(16, 185, 129, 0.08); padding: 20px; border-radius: 8px; border: 1px dashed var(--status-green); margin-bottom: 20px;">
+                    <p style="color: var(--text-muted); margin: 0;">Вы больше не можете проверять чужие работы, но видите результаты своих проверок.</p>
+                </div>
+                <div class="reviews-list">${reviewsHtml}</div>
+            `;
+        };
+
+        const renderP2PClosed = () => `
+            <div style="background: rgba(239, 68, 68, 0.12); padding: 30px; border-radius: 10px; border: 1px solid rgba(239, 68, 68, 0.35); text-align: center;">
+                <h3 style="margin-bottom: 15px; color: #f87171;">Доступ ограничен</h3>
+                <p style="color: var(--text-muted);">Организатор временно ограничил доступ к данному проекту для участников.</p>
+            </div>
+        `;
+
+        const renderExamUpload = () => `
+            <h3 style="margin-bottom: 20px;">Сбор работ</h3>
+            <div style="background: rgba(0,0,0,0.2); padding: 20px; border-radius: 8px; border: 1px dashed var(--border-color); margin-bottom: 20px;">
+                <p style="color: var(--text-muted); margin-bottom: 15px;">Загрузите работу для участия в проверке.</p>
+                <button id="btn-open-exam-upload" class="btn" style="background: var(--accent-blue); color: white;">📥 Загрузить работу</button>
+            </div>
+        `;
+
+        const renderExamReviewTable = (canEvaluate) => {
+            let myAssignedWorks = activeProject.submissions?.filter(sub =>
+                isAssignedToCurrentUser(sub)
+            ) || [];
             if ((!myAssignedWorks || myAssignedWorks.length === 0) && activeProject.submissions && activeProject.submissions.length > 0) {
                 const reqReviews = activeProject.requiredReviews || 2;
                 const candidate = activeProject.submissions.find(s =>
@@ -774,7 +868,7 @@ document.addEventListener("DOMContentLoaded", () => {
             }
 
             workspace.innerHTML = `
-                <h3 style="margin-bottom: 20px;">Работы на проверку (Экзамен):</h3>
+                <h3 style="margin-bottom: 20px;">Работы на проверку (Экзамен)</h3>
                 <div class="table-container">
                     <table class="data-table">
                         <thead>
@@ -789,29 +883,101 @@ document.addEventListener("DOMContentLoaded", () => {
                     </table>
                 </div>
             `;
-
             const tbody = document.getElementById("expert-exam-body");
+            if (!tbody) return;
             if (myAssignedWorks.length === 0) {
-                if (tbody) tbody.innerHTML = `<tr><td colspan="4" style="text-align: center; padding: 30px; color: var(--text-muted);">У вас нет назначенных работ.</td></tr>`;
-            } else {
-                myAssignedWorks.forEach(sub => {
-                    const myReview = sub.reviews?.find(r => r.reviewer?.user_id === currentUser?.id || r.reviewer_id === currentUser?.id || r.reviewerTg === currentUser?.tg);
-                    const reviewScore = myReview ? (myReview.rating ?? myReview.score ?? 0) : null;
-                    const statusText = myReview ? `<span style="color: var(--status-green);">✅ Оценено (${reviewScore})</span>` : `<span style="color: var(--status-orange);">⏳ Ожидает проверки</span>`;
-
-                    const tr = document.createElement("tr");
-                    tr.innerHTML = `
-                        <td>${sub.name || 'Без названия'}</td>
-                        <td>${sub.date || '—'}</td>
-                        <td>${statusText}</td>
-                        <td class="action-cell">
-                            <span class="action-icon" onclick="openWorkModalById(${sub.id})" title="Просмотр">👁️</span>
-                            <span class="action-icon" onclick="openExpertEvaluateModal(${sub.id})" title="Оценить">💬</span>
-                        </td>
-                    `;
-                    if (tbody) tbody.appendChild(tr);
-                });
+                tbody.innerHTML = `<tr><td colspan="4" style="text-align: center; padding: 30px; color: var(--text-muted);">У вас нет назначенных работ.</td></tr>`;
+                return;
             }
+            tbody.innerHTML = "";
+            myAssignedWorks.forEach(sub => {
+                const myReview = sub.reviews?.find(r => r.reviewer?.user_id === currentUser?.id || r.reviewer_id === currentUser?.id || r.reviewerTg === currentUser?.tg);
+                const reviewScore = myReview ? (myReview.rating ?? myReview.score ?? 0) : null;
+                const statusText = myReview ? `<span style="color: var(--status-green);">✅ Оценено (${reviewScore})</span>` : `<span style="color: var(--status-orange);">⏳ Ожидает проверки</span>`;
+                const tr = document.createElement("tr");
+                tr.innerHTML = `
+                    <td>${sub.name || 'Без названия'}</td>
+                    <td>${sub.date || '—'}</td>
+                    <td>${statusText}</td>
+                    <td class="action-cell">
+                        <span class="action-icon" onclick="openWorkModalById(${sub.id})" title="Просмотр">👁️</span>
+                        ${canEvaluate && !myReview ? `<span class="action-icon" onclick="openExpertEvaluateModal(${sub.id})" title="Оценить">💬</span>` : ''}
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        };
+
+        if (currentStage === 'closed') {
+            workspace.innerHTML = renderP2PClosed();
+            return;
+        }
+
+        if (activeProject.type === 'p2p') {
+            if (currentStage === 'collection') {
+                workspace.innerHTML = renderP2PCollection();
+            } else if (currentStage === 'reviewing') {
+                workspace.innerHTML = renderP2PReviewing();
+            } else if (currentStage === 'published') {
+                workspace.innerHTML = renderP2PPublished();
+            } else {
+                workspace.innerHTML = renderP2PCollection();
+            }
+            const btnUploadMyWork = document.getElementById("btn-upload-my-work");
+            const uploadMyWorkModal = document.getElementById("upload-my-work-modal");
+            if (btnUploadMyWork && uploadMyWorkModal) {
+                btnUploadMyWork.onclick = () => {
+                    const fileInput = document.getElementById("my-work-file");
+                    if (fileInput) fileInput.value = "";
+                    uploadMyWorkModal.style.display = "flex";
+                };
+            }
+            const closeUploadMyWork = document.getElementById("close-upload-my-work");
+            if (closeUploadMyWork) closeUploadMyWork.onclick = () => uploadMyWorkModal.style.display = "none";
+            const btnSubmitMyWork = document.getElementById("btn-submit-my-work");
+            if (btnSubmitMyWork) {
+                btnSubmitMyWork.onclick = async () => {
+                    const title = document.getElementById("my-work-title").value.trim() || "P2P Работа";
+                    const fileInput = document.getElementById("my-work-file");
+                    const file = fileInput ? fileInput.files[0] : null;
+                    if (!file) return alert("Пожалуйста, прикрепите файл!");
+                    try {
+                        await api.submitWork(activeProject.id, { title, file });
+                        alert("✅ Ваша работа успешно отправлена!");
+                        uploadMyWorkModal.style.display = "none";
+                        if (typeof loadProjectData === 'function') await loadProjectData(activeProject.id);
+                        updateDashboard();
+                    } catch (error) {
+                        console.error("Ошибка загрузки работы:", error);
+                        alert("❌ Ошибка при отправке работы. Проверьте консоль.");
+                    }
+                };
+            }
+            return;
+        }
+
+        if (currentStage === 'collection') {
+            workspace.innerHTML = renderExamUpload();
+            const btnOpenExamUpload = document.getElementById("btn-open-exam-upload");
+            const uploadExamModal = document.getElementById("upload-exam-modal");
+            if (btnOpenExamUpload && uploadExamModal) {
+                btnOpenExamUpload.onclick = () => {
+                    const fileInput = document.getElementById("exam-file");
+                    if (fileInput) fileInput.value = "";
+                    uploadExamModal.style.display = "flex";
+                };
+            }
+            return;
+        }
+
+        if (currentStage === 'reviewing') {
+            renderExamReviewTable(true);
+            return;
+        }
+
+        if (currentStage === 'published') {
+            renderExamReviewTable(false);
+            return;
         }
     }
 
@@ -819,7 +985,7 @@ document.addEventListener("DOMContentLoaded", () => {
     window.simulateP2PUpload = async function () {
         if (!activeProject) return;
         try {
-            await api.submitWork(activeProject.id, { title: "Моя работа", content: "https://storage.link/dummy_file.pdf", iteration_id: null });
+            await api.submitWork(activeProject.id, { title: "Моя работа", iteration_id: null });
             alert("Ваша работа успешно отправлена на бэкенд!");
             await loadProjectData(activeProject.id);
             updateDashboard();
@@ -948,7 +1114,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 if (reviewPanelEl) reviewPanelEl.style.display = 'none';
 
                 if (typeof updateStatsCounters === 'function') updateStatsCounters();
-            if (typeof updateRequestsBadge === 'function') updateRequestsBadge();
+                if (typeof updateRequestsBadge === 'function') updateRequestsBadge();
                 if (typeof renderTable === 'function') renderTable();
 
             } else {
@@ -1104,8 +1270,25 @@ document.addEventListener("DOMContentLoaded", () => {
         btnOpenControl.onclick = () => {
             if (!activeProject) return;
             if (activeProject.isSystemRunning === undefined) activeProject.isSystemRunning = false;
+
+            const titleInput = document.getElementById("panel-iteration-title");
+            const deadlineInput = document.getElementById("panel-iteration-deadline");
             const reqInput = document.getElementById("panel-req-reviews");
+
+            if (titleInput) titleInput.value = activeProject.iterationTitle || `Сборы: ${activeProject.name || 'этап'}`;
+
+            if (deadlineInput) {
+                if (activeProject.iterationDeadline) {
+                    const parsed = new Date(activeProject.iterationDeadline);
+                    if (!isNaN(parsed)) deadlineInput.value = parsed.toISOString().slice(0, 16);
+                } else {
+                    const defaultDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+                    deadlineInput.value = defaultDate.toISOString().slice(0, 16);
+                }
+            }
+
             if (reqInput) reqInput.value = activeProject.requiredReviews || 2;
+            renderIterationButtons();
             controlModal.style.display = 'flex';
         };
     }
@@ -1115,36 +1298,95 @@ document.addEventListener("DOMContentLoaded", () => {
         if (controlModal) controlModal.style.display = 'none';
     };
 
-    const btnStartGrading = document.getElementById("btn-start-grading");
-    if (btnStartGrading) {
-        btnStartGrading.onclick = async () => {
-            if (!activeProject) return;
-            try {
-                await api.updateIterationStatus(activeProject.id, activeIterationId, "reviewing");
-                activeProject.isSystemRunning = true;
-                alert("Проверка запущена на сервере!");
-                updateDashboard();
-            } catch (e) {
-                console.error(e);
-                alert("Ошибка запуска на сервере!");
+    function getIterationPayload(status) {
+        const titleInput = document.getElementById("panel-iteration-title");
+        const deadlineInput = document.getElementById("panel-iteration-deadline");
+        const reqInput = document.getElementById("panel-req-reviews");
+
+        const iterationTitle = titleInput?.value.trim() || activeProject?.iterationTitle || `Сборы: ${activeProject?.name || 'этап'}`;
+        const minReviews = parseInt(reqInput?.value, 10) || activeProject?.requiredReviews || 2;
+        let deadline = deadlineInput?.value ? new Date(deadlineInput.value) : null;
+        if (deadline && !isNaN(deadline)) {
+            deadline = deadline.toISOString();
+        } else {
+            deadline = activeProject?.iterationDeadline || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+        }
+
+        if (activeProject) {
+            activeProject.iterationTitle = iterationTitle;
+            activeProject.iterationDeadline = deadline;
+            activeProject.requiredReviews = minReviews;
+        }
+
+        return {
+            title: iterationTitle,
+            status,
+            settings: {
+                min_reviews_per_work: minReviews,
+                deadline
             }
         };
     }
 
-    const btnStopGrading = document.getElementById("btn-stop-grading");
-    if (btnStopGrading) {
-        btnStopGrading.onclick = async () => {
-            if (!activeProject) return;
-            try {
-                await api.updateIterationStatus(activeProject.id, activeIterationId, "closed");
-                activeProject.isSystemRunning = false;
-                alert("Проверка остановлена на сервере.");
-                updateDashboard();
-            } catch (e) {
-                console.error(e);
-                alert("Ошибка остановки на сервере!");
+    const iterationButtonConfig = {
+        1: { label: "Отправка работ", status: "collection" },
+        2: { label: "Проверка", status: "reviewing" },
+        3: { label: "Просмотр результатов", status: "published" },
+        4: { label: "Закрыто для просмотра", status: "closed" }
+    };
+
+    async function sendIterationPatch(iterationId, status) {
+        if (!activeProject) return;
+        const projectId = activeProject.project_id || activeProject.id;
+        if (!projectId) return alert("Проект не выбран.");
+
+        try {
+            await api.updateIterationStatus(projectId, iterationId, getIterationPayload(status));
+            saveIterationState(iterationId, status);
+            renderIterationButtons();
+            alert(`Итерация ${iterationId} отправлена с статусом ${status}.`);
+            updateDashboard();
+        } catch (e) {
+            console.error(e);
+            alert(`Не удалось отправить итерацию ${iterationId}: ${e.message || 'Ошибка сервера.'}`);
+        }
+    }
+
+    function renderIterationButtons() {
+        if (!iterationButtonsContainer) return;
+        iterationButtonsContainer.innerHTML = "";
+        activeIterationId = getSavedIterationId();
+
+        [1, 2, 3, 4].forEach((iterationId) => {
+            const config = iterationButtonConfig[iterationId];
+            const button = document.createElement("button");
+            button.type = "button";
+            button.className = "btn iteration-btn";
+            button.dataset.iterationId = iterationId;
+            button.innerText = config.label;
+            button.style.flex = "1";
+            button.style.minWidth = "100px";
+            button.style.border = "1px solid var(--border-color)";
+            button.style.padding = "10px 12px";
+            button.style.fontWeight = "600";
+            button.style.cursor = "pointer";
+            button.style.transition = "background 0.2s, color 0.2s, border-color 0.2s";
+
+            if (activeIterationId === iterationId) {
+                button.style.background = "rgba(34,197,94,0.14)";
+                button.style.color = "var(--text-main)";
+                button.style.borderColor = "var(--status-green)";
+            } else {
+                button.style.background = "rgba(255,255,255,0.04)";
+                button.style.color = "var(--text-main)";
             }
-        };
+
+            button.onclick = async () => {
+                await sendIterationPatch(iterationId, config.status);
+            };
+
+            iterationButtonsContainer.appendChild(button);
+        });
     }
 
     const btnGlobalRefresh = document.getElementById("btn-global-refresh");
@@ -1448,7 +1690,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if (btnAddExamWork && uploadExamModal) {
         btnAddExamWork.onclick = () => {
-            document.getElementById("exam-file-url").value = ""; // Очищаем поле
+            const fileInput = document.getElementById("exam-file");
+            if (fileInput) fileInput.value = ""; // Очищаем поле
             uploadExamModal.style.display = "flex";
         };
     }
@@ -1465,15 +1708,16 @@ document.addEventListener("DOMContentLoaded", () => {
     const btnSubmitExamWork = document.getElementById("btn-submit-exam-work");
     if (btnSubmitExamWork) {
         btnSubmitExamWork.onclick = async () => {
-            const fileUrl = document.getElementById("exam-file-url").value.trim();
+            const fileInput = document.getElementById("exam-file");
+            const file = fileInput ? fileInput.files[0] : null;
 
-            if (!fileUrl) return alert("Пожалуйста, введите ссылку на файл!");
+            if (!file) return alert("Пожалуйста, прикрепите файл!");
 
             try {
                 // Отправляем POST /projects/{id}/works
                 await api.submitWork(activeProject.id, {
                     title: "Экзаменационная работа",
-                    content: fileUrl
+                    file: file
                 });
 
                 alert("✅ Работа успешно добавлена!");

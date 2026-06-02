@@ -175,20 +175,46 @@ const api = {
         }));
     },
 
-    async submitWork(projectId, { title, content, iteration_id = null }) {
-        return await this.request(`/projects/${projectId}/works`, "POST", {
-            title, content, iteration_id
-        });
+    async submitWork(projectId, { title, file, iteration_id = null }) {
+        const formData = new FormData();
+        if (title) formData.append("title", title);
+        if (iteration_id) formData.append("iteration_id", iteration_id);
+        if (file) formData.append("file", file);
+
+        const headers = {};
+        const token = this.getToken();
+        if (token) headers["Authorization"] = `Bearer ${token}`;
+
+        try {
+            const response = await fetch(`${API_BASE_URL}/projects/${projectId}/works`, {
+                method: "POST",
+                headers: headers,
+                body: formData
+            });
+            if (!response.ok) {
+                const err = await response.json().catch(() => ({}));
+                throw new Error(err.detail || `Error ${response.status}`);
+            }
+            return await response.json();
+        } catch (error) {
+            console.error("Error submitting work:", error);
+            throw error;
+        }
     },
 
     // ==========================================
     // 3. ИТЕРАЦИИ (Сборы)
     // ==========================================
-    async updateIterationStatus(projectId, iterationId, status) {
-        // Подстроено под PATCH /projects/{id}/iterations/{it_id}
-        return await this.request(`/projects/${projectId}/iterations/${iterationId}`, "PATCH", {
-            status: status
-        });
+    async updateIterationStatus(projectId, iterationId, body) {
+        // Поддерживает тело PATCH /projects/{id}/iterations/{it_id}
+        const payload = typeof body === "string"
+            ? { status: body }
+            : body || {};
+        const normalizedIterationId = Number.isInteger(iterationId)
+            ? iterationId
+            : parseInt(String(iterationId), 10);
+        const endpointId = Number.isInteger(normalizedIterationId) ? normalizedIterationId : iterationId;
+        return await this.request(`/projects/${projectId}/iterations/${endpointId}`, "PATCH", payload);
     },
 
     // ==========================================
