@@ -1,9 +1,17 @@
 // js/api.js — ИСПРАВЛЕННАЯ ВЕРСИЯ (Адаптация под новые JSON-схемы)
 // Автоматическое определение адреса бэкенда
 
+function getCurrentApiBaseUrl() {
+    if (typeof window !== 'undefined' && window.SERVEO_API_URL) {
+        const url = String(window.SERVEO_API_URL).trim();
+        if (url && url.toLowerCase() !== 'null') {
+            return url.replace(/\/+$/, '');
+        }
+    }
+    return 'http://localhost:8000';
+}
 
-const API_BASE_URL = 'http://localhost:8000'; 
-
+const API_BASE_URL = getCurrentApiBaseUrl();
 const axiosInstance = axios.create({
     baseURL: API_BASE_URL,
     headers: {
@@ -11,6 +19,9 @@ const axiosInstance = axios.create({
     },
     timeout: 20000,
 });
+
+console.log(`✅ Используется backend: ${API_BASE_URL}`);
+
 
 const api = {
     // === Управление токеном ===
@@ -49,6 +60,7 @@ const api = {
         }
 
         try {
+            axiosInstance.defaults.baseURL = getCurrentApiBaseUrl();
             const response = await axiosInstance.request({
                 url: endpoint,
                 method,

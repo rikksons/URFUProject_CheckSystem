@@ -1,8 +1,10 @@
 import argparse
 import json
 import os
+import re
 import subprocess
 import sys
+import threading
 from pathlib import Path
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
@@ -17,6 +19,9 @@ from routers import (
     auth,
 )  # ← добавили auth
 import uvicorn
+
+
+FRONTEND_SERVEO_JS = Path(__file__).resolve().parent.parent / "frontend" / "js" / "serveo-url.js"
 
 
 def get_ngrok_token():
@@ -35,6 +40,37 @@ def get_ngrok_token():
     except Exception as exc:
         print(f"⚠️ Ошибка чтения {credentials_path}: {exc}", file=sys.stderr)
         return None
+
+
+def write_serveo_url_script(url=None):
+    try:
+        FRONTEND_SERVEO_JS.parent.mkdir(parents=True, exist_ok=True)
+        with FRONTEND_SERVEO_JS.open("w", encoding="utf-8") as handle:
+            if url:
+                js_url = json.dumps(url)
+                handle.write(f"window.SERVEO_API_URL = {js_url};\n")
+                handle.write(f"console.log('✅ Serveo API URL set: {url}');\n")
+            else:
+                handle.write("window.SERVEO_API_URL = null;\n")
+                handle.write("console.log('ℹ️ Serveo API URL is not configured, fallback to localhost.');\n")
+    except Exception as exc:
+        print(f"⚠️ Ошибка записи {FRONTEND_SERVEO_JS}: {exc}", file=sys.stderr)
+
+
+def watch_serveo_output(proc):
+    if proc.stdout is None:
+        return
+    for raw_line in proc.stdout:
+        line = raw_line.strip()
+        if line:
+            print(line)
+        match = re.search(r"https?://[\w\-\.]+(?:\.serveo(?:\.net|usercontent\.com)|[\w\-\.]+)", line)
+        if match:
+            write_serveo_url_script(match.group(0))
+
+
+# write default file so frontend always has the script
+write_serveo_url_script(None)
 
 
 def launch_proxy_services():
@@ -69,7 +105,6 @@ def launch_proxy_services():
             # ✅ Настраиваем потоки индивидуально для каждого прокси
             if name == "ngrok":
                 # Подавляем TUI-интерфейс ngrok, отправляя вывод в никуда.
-                # Токен применится, туннель поднимется в фоне, терминал останется чистым.
                 proc = subprocess.Popen(
                     cmd,
                     stdout=subprocess.DEVNULL,
@@ -78,15 +113,16 @@ def launch_proxy_services():
                     text=True,
                 )
             else:
-                # Для serveo оставляем вывод в sys.stdout, чтобы вы видели его ссылку
+                # Для serveo читаем вывод, чтобы автоматически определить URL.
                 proc = subprocess.Popen(
                     cmd,
-                    stdout=sys.stdout,
-                    stderr=sys.stderr,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
                     stdin=subprocess.DEVNULL,
                     text=True,
                 )
-                
+                threading.Thread(target=watch_serveo_output, args=(proc,), daemon=True).start()
+
             print(f"✅ Proxy {name} started: {' '.join(visible_cmd)} (pid={proc.pid})")
             processes.append((name, proc))
         except FileNotFoundError:
