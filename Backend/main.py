@@ -2,6 +2,7 @@ import argparse
 import json
 import os
 import re
+
 import subprocess
 import sys
 import threading
@@ -36,7 +37,12 @@ def get_ngrok_token():
     try:
         with credentials_path.open("r", encoding="utf-8") as handle:
             data = json.load(handle)
-            return data.get("NGROK_AUTHTOKEN")
+            token = data.get("NGROK_AUTHTOKEN")
+            # ✅ Валидация: токен должен содержать только безопасные символы
+            if token and not re.match(r"^[a-zA-Z0-9_\-]{10,}$", str(token)):
+                print(f"⚠️ Некорректный формат NGROK_AUTHTOKEN. Пропускаем.", file=sys.stderr)
+                return None
+            return token
     except Exception as exc:
         print(f"⚠️ Ошибка чтения {credentials_path}: {exc}", file=sys.stderr)
         return None
@@ -103,23 +109,27 @@ def launch_proxy_services():
             visible_cmd = [c if c != ngrok_token else "********" for c in cmd]
             
             # ✅ Настраиваем потоки индивидуально для каждого прокси
+            # ✅ БЕЗОПАСНО: используем list-форму вместо shell=True
+            # ✅ Команды жёстко закодированы, без eval/exec/format
             if name == "ngrok":
                 # Подавляем TUI-интерфейс ngrok, отправляя вывод в никуда.
                 proc = subprocess.Popen(
-                    cmd,
+                    cmd,  # ← list, не строка - защита от command injection
                     stdout=subprocess.DEVNULL,
                     stderr=subprocess.DEVNULL,
                     stdin=subprocess.DEVNULL,
                     text=True,
+                    # Не используем shell=True - КРИТИЧНО для безопасности!
                 )
             else:
                 # Для serveo читаем вывод, чтобы автоматически определить URL.
                 proc = subprocess.Popen(
-                    cmd,
+                    cmd,  # ← list, не строка - защита от command injection
                     stdout=subprocess.PIPE,
                     stderr=subprocess.STDOUT,
                     stdin=subprocess.DEVNULL,
                     text=True,
+                    # Не используем shell=True - КРИТИЧНО для безопасности!
                 )
                 threading.Thread(target=watch_serveo_output, args=(proc,), daemon=True).start()
 
