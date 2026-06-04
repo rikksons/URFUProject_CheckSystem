@@ -18,22 +18,6 @@
             </div>
             <div class="projects-list">
                 <div class="section-title">ПРОЕКТ <button class="add-btn">+</button></div>
-
-                <div class="project-item active">
-                    <div class="project-icon blue">В</div>
-                    <div class="project-info">
-                        <div class="project-name">Веб-разработка <span class="badge orange">3</span></div>
-                        <div class="project-meta">📄 3 👥 2 <span>Expert</span></div>
-                    </div>
-                </div>
-
-                <div class="project-item">
-                    <div class="project-icon green">М</div>
-                    <div class="project-info">
-                        <div class="project-name">Машинное обуче... <span class="badge yellow">12</span></div>
-                        <div class="project-meta">📄 12 👥 1 <span>Peer</span></div>
-                    </div>
-                </div>
             </div>
         </aside>
 
@@ -173,6 +157,8 @@
             </div>
         </aside>
     </div>
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <script src="js/serveo-url.js"></script>
     <script src="js/api.js"></script>
     <script src="js/app.js"></script>
     <div id="work-modal" class="modal" style="display: none;">
@@ -256,24 +242,22 @@
             <h3 style="margin-bottom: 20px;">Управление проектом</h3>
 
             <div class="control-section">
+                <label style="display: block; margin-bottom: 8px;">Название этапа:</label>
+                <input type="text" id="panel-iteration-title" class="input-field" placeholder="Второй этап сбора">
+            </div>
+            <div class="control-section" style="margin-top: 15px;">
+                <label style="display: block; margin-bottom: 8px;">Крайний срок:</label>
+                <input type="datetime-local" id="panel-iteration-deadline" class="input-field">
+            </div>
+            <div class="control-section" style="margin-top: 15px;">
                 <label style="display: block; margin-bottom: 8px;">Количество проверок на работу:</label>
                 <input type="number" id="panel-req-reviews" min="1" max="5" class="input-field">
             </div>
-
-            <div class="control-section" style="margin-top: 25px;">
-                <label style="display: block; margin-bottom: 8px;">Состояние системы:</label>
-                <div style="display: flex; gap: 10px;">
-                    <button id="btn-start-grading" class="btn"
-                        style="background: var(--status-green); color: white; flex: 1; display: flex; align-items: center; justify-content: center; gap: 5px;">▶️
-                        Начать</button>
-                    <button id="btn-stop-grading" class="btn"
-                        style="background: var(--status-orange); color: white; flex: 1; display: flex; align-items: center; justify-content: center; gap: 5px;">⏸️
-                        Остановить</button>
-                </div>
-                <p style="font-size: 11px; color: var(--text-muted); margin-top: 10px;">
-                    При остановке эксперты не смогут брать новые работы, но доделают текущие.
-                </p>
+            <div class="control-section" style="margin-top: 15px;">
+                <label style="display: block; margin-bottom: 8px;">Итерация:</label>
+                <div id="iteration-buttons" style="display: flex; gap: 10px; flex-wrap: wrap;"></div>
             </div>
+
 
             <div class="control-section"
                 style="margin-top: 25px; border-top: 1px solid var(--border-color); padding-top: 20px;">
@@ -299,8 +283,8 @@
             <h3 style="margin-bottom: 20px;">Загрузить работу (Экзамен)</h3>
 
             <div class="form-group">
-                <label>Ссылка на файл (PDF, архив и т.д.)</label>
-                <input type="text" id="exam-file-url" placeholder="https://storage.link/file.pdf" class="input-field">
+                <label>Файл (PDF, архив, изображение и т.д.)</label>
+                <input type="file" id="exam-file" class="input-field">
             </div>
 
             <button id="btn-submit-exam-work" class="btn"
@@ -320,8 +304,8 @@
             </div>
 
             <div class="form-group" style="margin-top: 15px;">
-                <label>Ссылка на файл (GitHub, Google Drive и т.д.)</label>
-                <input type="text" id="my-work-url" placeholder="https://..." class="input-field">
+                <label>Файл работы</label>
+                <input type="file" id="my-work-file" class="input-field">
             </div>
 
             <button id="btn-submit-my-work" class="btn"

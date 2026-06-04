@@ -18,6 +18,8 @@ class SheetsDB:
             SERVICE_ACCOUNT_FILE, scopes=scopes
         )
         self.gc = gspread.authorize(creds)
+        if not SPREADSHEET_ID:
+            raise ValueError("SPREADSHEET_ID must be set in config")
         self.ss = self.gc.open_by_key(SPREADSHEET_ID)
         self.cache = TTLCache(maxsize=50, ttl=120)
 
@@ -179,7 +181,7 @@ class SheetsDB:
                 self.invalidate(sheet_name)
                 return True
             return False  # Строка не найдена
-        except gspread.exceptions.CellNotFound:
+        except gspread.exceptions.GSpreadException:
             print(f"Info: Row with id={row_id} not found in {sheet_name} for deletion.")
             return False
         except Exception as e:

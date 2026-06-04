@@ -1,0 +1,15 @@
+# ngrok start --all --config ./ngrok.yml
+version: "3"
+tunnels:
+  frontend:
+    proto: http
+    addr: 5500
+    domain: unbridle-deafness-dispatch.ngrok-free.dev
+    host_header: localhost:5500
+    traffic_policy:
+      inbound:
+        - actions:
+            - type: "add-headers"
+              config:
+                headers:
+                  ngrok-skip-browser-warning: "true"

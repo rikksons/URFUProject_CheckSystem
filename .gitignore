@@ -1,0 +1,88 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+env/
+venv/
+ENV/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+pip-log.txt
+pip-delete-this-directory.txt
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+# Node
+node_modules/
+npm-debug.log
+npm-error.log
+yarn-error.log
+.npm/
+package-lock.json
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+*.sublime-project
+*.sublime-workspace
+
+# Environment
+.env
+.env.local
+.env.*.local
+.env.development
+.env.production
+
+# Project specific
+uploads/
+logs/
+*.log
+.cache/
+
+# OS
+Thumbs.db
+*.lnk
+
+# ngrok
+ngrok.exe
+ngrok
+
+# Temporary
+*.tmp
+*.bak
+*.swp
+.~*
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# API Keys and secrets
+secrets.json
+credentials.json
+config_local.py
+
