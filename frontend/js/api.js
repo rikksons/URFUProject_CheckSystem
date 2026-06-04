@@ -207,21 +207,42 @@ const api = {
         if (iteration_id) formData.append("iteration_id", iteration_id);
         if (file) formData.append("file", file);
 
-        const headers = {};
+        // ✅ ИСПРАВЛЕНО: Используем актуальный baseURL вместо жёстко закодированного
+        const baseURL = getCurrentApiBaseUrl();
+        
+        // ✅ ИСПРАВЛЕНО: Добавляем X-Bypass-Token как в других методах
+        const headers = {
+            "X-Bypass-Token": this.getBypassToken(),
+        };
+
         const token = this.getToken();
-        if (token) headers["Authorization"] = `Bearer ${token}`;
+        if (token) {
+            headers["Authorization"] = `Bearer ${token}`;
+        }
+
+        const debugId = localStorage.getItem("debug_user_id");
+        if (debugId && !token) {
+            headers["X-User-Id"] = debugId;
+        }
 
         try {
-            const response = await fetch(`${API_BASE_URL}/projects/${projectId}/works`, {
+            // ✅ ИСПРАВЛЕНО: Используем axios вместо fetch для единообразия
+            // Не устанавливаем Content-Type - браузер автоматически установит multipart/form-data с boundary
+            const response = await axiosInstance.request({
+                url: `/projects/${projectId}/works`,
                 method: "POST",
                 headers: headers,
-                body: formData
+                data: formData,
+                baseURL: baseURL,
+                validateStatus: status => status >= 200 && status < 500,
             });
-            if (!response.ok) {
-                const err = await response.json().catch(() => ({}));
-                throw new Error(err.detail || `Error ${response.status}`);
+
+            if (response.status >= 400) {
+                const err = response.data;
+                throw new Error(err?.detail || err?.message || `Error ${response.status}`);
             }
-            return await response.json();
+
+            return response.data;
         } catch (error) {
             console.error("Error submitting work:", error);
             throw error;

@@ -82,7 +82,7 @@ write_serveo_url_script(None)
 def launch_proxy_services():
     """Запускает proxy: serveo и ngrok."""
     proxy_commands = [
-        ("serveo", ["ssh", "-R", "80:localhost:8000", "serveo.net"]),
+        ("serveo", ["ssh", "-o", "ServerAliveInterval=60", "-o", "ServerAliveCountMax=3", "-R", "woodzeii:80:localhost:8000", "serveo.net", "|", "grep", "-v", "-E", "Tip|Upgrade to Pro"]),
     ]
 
     ngrok_token = get_ngrok_token()
