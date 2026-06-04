@@ -6,6 +6,8 @@ document.addEventListener("DOMContentLoaded", () => {
     let activeProject = null;
     let currentUser = null;
 
+    const isMobile = window.innerWidth <= 900;
+
     // === ДОБАВЛЕННЫЙ БЛОК: Кнопка сворачивания проектов ===
     const sidebarLeft = document.querySelector('.sidebar-left');
     if (sidebarLeft) {
@@ -14,6 +16,11 @@ document.addEventListener("DOMContentLoaded", () => {
         toggleBtn.innerHTML = '📁';
         toggleBtn.title = 'Свернуть/Развернуть панель проектов';
         document.body.appendChild(toggleBtn);
+
+        if (isMobile) {
+            sidebarLeft.classList.add('collapsed');
+            toggleBtn.classList.add('collapsed');
+        }
 
         toggleBtn.onclick = () => {
             sidebarLeft.classList.toggle('collapsed');
@@ -24,10 +31,14 @@ document.addEventListener("DOMContentLoaded", () => {
     // === ДОБАВЛЕННЫЙ БЛОК: Кнопка сворачивания участников ===
     const sidebarRight = document.querySelector('.sidebar-right');
     if (sidebarRight) {
-        sidebarRight.classList.add('collapsed'); // Скрываем панель по умолчанию
+        if (isMobile) {
+            sidebarRight.classList.add('collapsed');
+        } else {
+            sidebarRight.classList.remove('collapsed');
+        }
 
         const toggleRightBtn = document.createElement('button');
-        toggleRightBtn.className = 'sidebar-right-toggle-btn collapsed'; // Синхронизируем состояние кнопки
+        toggleRightBtn.className = 'sidebar-right-toggle-btn' + (isMobile ? ' collapsed' : '');
         toggleRightBtn.innerHTML = '👥';
         toggleRightBtn.title = 'Свернуть/Развернуть панель участников';
         document.body.appendChild(toggleRightBtn);
